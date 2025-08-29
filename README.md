@@ -1,4 +1,4 @@
-# EEPROM 28C64 Basic RW Example for Arduino
+# EEPROM 28C64 API
 
 ## Init
 
