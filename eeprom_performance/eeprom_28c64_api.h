@@ -3,7 +3,7 @@
 #ifndef __eeprom_28c64_api_h__
 #define __eeprom_28c64_api_h__
 
-#define _EEPROM_DEBUG_LOGGING
+// #define _EEPROM_DEBUG_LOGGING
 #ifdef _EEPROM_DEBUG_LOGGING
 #define _debugPrint(log) Serial.print(log)
 #define _debugPrintln(log) Serial.println(log)
@@ -90,6 +90,10 @@ private:
   uint8_t _writeEnablePin;   // !WE
   // status
   uint8_t _readyBusyOutputPin;  // READY / !BUSY
+
+  // inner state
+  bool _readState;
+  bool _writeState;
 };
 
 Eeprom28C64Api::Eeprom28C64Api(
@@ -113,6 +117,10 @@ Eeprom28C64Api::Eeprom28C64Api(
   _writeEnablePin = writeEnablePin;
   // status
   _readyBusyOutputPin = readyBusyOutputPin;
+
+  // inner state
+  _readState = false;
+  _writeState = false;
 }
 
 void Eeprom28C64Api::_changeDataPinsMode(const Eeprom28C64Api::_DataPinsMode mode) {
@@ -160,9 +168,15 @@ void Eeprom28C64Api::readInit() {
   _outputEnable(false);
   _writeEnable(false);
   _changeDataPinsMode(_DataPinsMode::DATA_PINS_READ);
+
+  _readState = true;
 }
 
 uint8_t Eeprom28C64Api::readData(const uint16_t address) {
+  if (!_readState) {
+    return 0;
+  }
+
   // convert address to bits
   bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
   uint64ToBits((uint64_t)address, bAddress, _EEPROM_28C64_ADDR_BUS_SIZE);
@@ -173,7 +187,6 @@ uint8_t Eeprom28C64Api::readData(const uint16_t address) {
     digitalWrite(_addressPins[i], bAddress[i]);
     _debugPrint(bAddress[i]);
   }
-  delay(1);
 
   // chip enable
   _chipEnable(true);
@@ -212,9 +225,15 @@ void Eeprom28C64Api::writeInit() {
   _outputEnable(true);
   _writeEnable(false);
   _changeDataPinsMode(_DataPinsMode::DATA_PINS_WRITE);
+
+  _writeState = true;
 }
 
 void Eeprom28C64Api::writeData(const uint16_t address, const uint8_t data) {
+  if (!_writeState) {
+    return;
+  }
+
   // convert address to bits
   bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
   uint64ToBits((uint64_t)address, bAddress, _EEPROM_28C64_ADDR_BUS_SIZE);
@@ -251,6 +270,9 @@ void Eeprom28C64Api::writeData(const uint16_t address, const uint8_t data) {
   // wrtie enable (initiates the write op)
   _writeEnable(true);
   delay(1);
+
+  // wait for the data propagation
+  delay(10);
 
   // wrtie disable
   _writeEnable(false);

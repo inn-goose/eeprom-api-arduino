@@ -61,76 +61,104 @@ void setup() {
 }
 
 
-// execute the loop code only once
-bool executed_once = false;
-
 const int ADDRESS_SPACE_SIZE = 8192;
-const int USABLE_ADDRESS_OFFSET = 0;
-const int USABLE_ADDRESS_SPACE_SIZE = 8;
+const int USABLE_ADDRESS_OFFSET = 1024;
+const int USABLE_ADDRESS_SPACE_SIZE = 512;
 uint8_t writeValues[ADDRESS_SPACE_SIZE];
 uint8_t readValues[ADDRESS_SPACE_SIZE];
 bool damagedCells[ADDRESS_SPACE_SIZE];
 int damagedCellsTotal = 0;
 
+int op_write = 0;
+int op_read = -1;
+bool op_verify = false;
+
+int write_total_micros = 0;
+int read_total_micros = 0;
+
 void loop() {
-  if (executed_once) {
-    return;
-  }
-  executed_once = true;
+  if (op_write >= 0) {
+    // init
+    if (op_write == 0) {
+      setBuiltinLed(LEDR);
+      eeprom28C64Api.writeInit();
+    }
 
-  delay(1000);
+    uint16_t address = (uint16_t)(USABLE_ADDRESS_OFFSET + op_write);
+    uint8_t data = (uint8_t)random(1, 255);
+    // uint8_t data = (uint8_t)op_write;
 
-  // WARMUP READ
-  setBuiltinLed(LEDB);
-  for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
-    uint16_t address = (uint16_t)(USABLE_ADDRESS_OFFSET + i);
-    uint8_t data = eeprom28C64Api.readData(address);
-    Serial.println("R1 [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
-  }
-  setBuiltinLed(-1);
+    writeValues[op_write] = data;
 
-  // WRITE
-  setBuiltinLed(LEDR);
-  int write_total_micros = 0;
-  for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
-    uint16_t address = (uint16_t)(USABLE_ADDRESS_OFFSET + i);
-    // uint8_t data = (uint8_t)random(1, 255);
-    uint8_t data = (uint8_t)i;
-    writeValues[i] = data;
     int write_start = micros();
     eeprom28C64Api.writeData(address, data);
     write_total_micros += micros() - write_start;
-    Serial.println("W [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
+
+    // Serial.println("W [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
+
+    op_write += 1;
+    // deinit
+    if (op_write > USABLE_ADDRESS_SPACE_SIZE) {
+      setBuiltinLed(-1);
+      op_write = -1;
+      op_read = 0;
+      Serial.flush();
+      delay(500);
+      return;
+    }
   }
-  setBuiltinLed(-1);
 
-  // READ
+  if (op_read >= 0) {
+    // init
+    if (op_read == 0) {
+      setBuiltinLed(LEDB);
+      eeprom28C64Api.readInit();
+    }
 
-  setBuiltinLed(LEDB);
-  int read_total_micros = 0;
-  for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
-    uint16_t address = (uint16_t)(USABLE_ADDRESS_OFFSET + i);
+    uint16_t address = (uint16_t)(USABLE_ADDRESS_OFFSET + op_read);
+
     int read_start = micros();
     uint8_t data = eeprom28C64Api.readData(address);
     read_total_micros += micros() - read_start;
-    readValues[i] = data;
-    Serial.println("R2 [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
-  }
-  setBuiltinLed(-1);
 
-  // check damaged cells
-  for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
-    if (writeValues[i] != readValues[i]) {
-      damagedCells[i] = true;
-      damagedCellsTotal += 1;
-      // Serial.println(getAddressStr(i) + " | W: " + getDataStr(writeValues[i]) + " | R: " + getDataStr(readValues[i]));
+    readValues[op_read] = data;
+
+    // Serial.println("R [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
+
+    op_read += 1;
+    // deinit
+    if (op_read > USABLE_ADDRESS_SPACE_SIZE) {
+      setBuiltinLed(-1);
+      op_read = -1;
+      op_verify = true;
+      Serial.flush();
+      delay(500);
+      return;
     }
-    Serial.println(getAddressStr(i) + " | W: " + getDataStr(writeValues[i]) + " | R: " + getDataStr(readValues[i]));
   }
 
-  Serial.println("W | T: " + String(write_total_micros) + " | C: " + String(write_total_micros / USABLE_ADDRESS_SPACE_SIZE));
-  Serial.println("R | T: " + String(read_total_micros) + " | C: " + String(read_total_micros / USABLE_ADDRESS_SPACE_SIZE));
-  if (damagedCellsTotal) {
-    Serial.println("damagedCellsTotal: " + String(damagedCellsTotal));
+  if (op_verify) {
+    op_verify = false;
+
+    // check damaged cells
+    for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
+      if (writeValues[i] != readValues[i]) {
+        damagedCells[i] = true;
+        damagedCellsTotal += 1;
+        Serial.println(getAddressStr(i) + " | W: " + getDataStr(writeValues[i]) + " | R: " + getDataStr(readValues[i]));
+      }
+    }
+
+    Serial.println("W | T: " + String(write_total_micros) + " us | C: " + String(write_total_micros / USABLE_ADDRESS_SPACE_SIZE) + " us");
+    Serial.println("R | T: " + String(read_total_micros) + " us | C: " + String(read_total_micros / USABLE_ADDRESS_SPACE_SIZE) + " us");
+    if (damagedCellsTotal) {
+      Serial.println("VERIFY: damagedCellsTotal: " + String(damagedCellsTotal));
+    } else {
+      Serial.println("VERIFY: OK");
+    }
+
+    Serial.flush();
+    delay(500);
+    return;
   }
 }
