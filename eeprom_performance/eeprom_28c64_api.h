@@ -200,7 +200,10 @@ uint8_t Eeprom28C64Api::readData(const uint16_t address) {
   // (3) output enable
   digitalWrite(_outputEnablePin, LOW);
 
-  // (4) read data
+  // (4) !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
+  // delayMicroseconds(1);  // arduino cannot delay in ns, only us
+
+  // (5) read data
   _debugPrint(" | data: b");
   for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
     bData[i] = digitalRead(_dataPins[i]) ? 1 : 0;
@@ -208,10 +211,10 @@ uint8_t Eeprom28C64Api::readData(const uint16_t address) {
   }
   _debugPrintln();
 
-  // (5) output disable
+  // (6) output disable
   digitalWrite(_outputEnablePin, HIGH);
 
-  // (6) chip disable
+  // (7) chip disable
   digitalWrite(_chipEnablePin, HIGH);
 
   return (uint8_t)bitsToUint64(bData, _EEPROM_28C64_DATA_BUS_SIZE);
