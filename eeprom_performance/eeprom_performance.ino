@@ -63,8 +63,9 @@ void setup() {
 
 const int ADDRESS_SPACE_SIZE = 8192;
 const int USABLE_ADDRESS_OFFSET = 1024;
-const int USABLE_ADDRESS_SPACE_SIZE = 512;
+const int USABLE_ADDRESS_SPACE_SIZE = 1024;
 uint8_t writeValues[ADDRESS_SPACE_SIZE];
+int busyStateUsec[ADDRESS_SPACE_SIZE];
 uint8_t readValues[ADDRESS_SPACE_SIZE];
 bool damagedCells[ADDRESS_SPACE_SIZE];
 int damagedCellsTotal = 0;
@@ -93,6 +94,8 @@ void loop() {
     int write_start = micros();
     eeprom28C64Api.writeData(address, data);
     write_total_micros += micros() - write_start;
+
+    busyStateUsec[op_write] = eeprom28C64Api.busyStateUsec();
 
     // Serial.println("W [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
 
@@ -149,8 +152,16 @@ void loop() {
       }
     }
 
-    Serial.println("W | T: " + String(write_total_micros) + " us | C: " + String(write_total_micros / USABLE_ADDRESS_SPACE_SIZE) + " us");
-    Serial.println("R | T: " + String(read_total_micros) + " us | C: " + String(read_total_micros / USABLE_ADDRESS_SPACE_SIZE) + " us");
+    int busyStateUsecTotal = 0;
+    int busyStateUsecMax = 0;
+    for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
+      busyStateUsecTotal += busyStateUsec[i];
+      busyStateUsecMax = max(busyStateUsecMax, busyStateUsec[i]);
+    }
+    Serial.println("B | T: " + String(busyStateUsecTotal) + " us | AVG: " + String(busyStateUsecTotal / USABLE_ADDRESS_SPACE_SIZE) + " us | MAX: " + String(busyStateUsecMax) + " us");
+
+    Serial.println("W | T: " + String(write_total_micros) + " us | AVG: " + String(write_total_micros / USABLE_ADDRESS_SPACE_SIZE) + " us");
+    Serial.println("R | T: " + String(read_total_micros) + " us | AVG: " + String(read_total_micros / USABLE_ADDRESS_SPACE_SIZE) + " us");
     if (damagedCellsTotal) {
       Serial.println("VERIFY: damagedCellsTotal: " + String(damagedCellsTotal));
     } else {
