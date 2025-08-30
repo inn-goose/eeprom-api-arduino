@@ -267,13 +267,35 @@ void Eeprom28C64Api::writeData(const uint16_t address, const uint8_t data) {
   // (6) chip disable
   digitalWrite(_chipEnablePin, HIGH);
 
-  // (7) time to device !BUSY state (50 ms MAX)
+  // (7) wait until device switches to !BUSY state
+  // Time to Device Busy (delta between WE and !BUSY) == 50 ms MAX (spec)
   delayMicroseconds(1);  // arduino cannot delay in ns, only us
+  PinStatus currBusyState = digitalRead(_readyBusyOutputPin);
+
+  int busyStateStart = micros();
 
   // wait until !BUSY state switches to READY state (1 ms MAX)
-  int busyStateStart = micros();
-  // while (digitalRead(_readyBusyOutputPin) == LOW) {}
-  delayMicroseconds(1.2 * 1000);  // 1 ms is not enough
+  // or just wait for the Write Cycle Time MAX
+  static const int totalDelayMsec = 1.4 * 1000;  // 1 ms is not enough
+  if (currBusyState == LOW) {
+    // device is in !BUSY state
+    // use the READY/!BUSY pin status to wait for the Write Cycle End
+    PinStatus prevBusyState = currBusyState;
+    static const int attemptDelayMsec = 200;
+    for (int i = 0; i < totalDelayMsec / attemptDelayMsec; i++) {
+      delayMicroseconds(attemptDelayMsec);
+      prevBusyState = currBusyState;
+      currBusyState = digitalRead(_readyBusyOutputPin);
+      if (prevBusyState == LOW && currBusyState == HIGH) {  // rising edge
+        break;
+      }
+    }
+  } else {
+    // device not in !BUSY state
+    // use generic delay
+    delayMicroseconds(totalDelayMsec);
+  }
+
   _busyStateUsec = micros() - busyStateStart;
 }
 
