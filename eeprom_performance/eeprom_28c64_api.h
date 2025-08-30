@@ -273,7 +273,7 @@ void Eeprom28C64Api::writeData(const uint16_t address, const uint8_t data) {
   // wait until !BUSY state switches to READY state (1 ms MAX)
   int busyStateStart = micros();
   // while (digitalRead(_readyBusyOutputPin) == LOW) {}
-  delay(2);  // 1 ms is not enough
+  delayMicroseconds(1.2 * 1000);  // 1 ms is not enough
   _busyStateUsec = micros() - busyStateStart;
 }
 
