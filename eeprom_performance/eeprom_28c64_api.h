@@ -79,10 +79,6 @@ private:
   };
   void _changeDataPinsMode(const _DataPinsMode mode);
 
-  void _chipEnable(const bool ehable);
-  void _outputEnable(const bool ehable);
-  void _writeEnable(const bool ehable);
-
   // PINS
   // address
   uint8_t _addressPins[_EEPROM_28C64_ADDR_BUS_SIZE];
@@ -170,12 +166,13 @@ void Eeprom28C64Api::init() {
 }
 
 void Eeprom28C64Api::readInit() {
-  _chipEnable(true);  // always true
-  _outputEnable(false);
-  _writeEnable(false);  // not in use
-  _changeDataPinsMode(_DataPinsMode::DATA_PINS_READ);
-
   _readState = true;
+  // initial READ waveforms state
+  digitalWrite(_chipEnablePin, HIGH);    // off
+  digitalWrite(_outputEnablePin, HIGH);  // off
+  digitalWrite(_writeEnablePin, HIGH);   // not in use
+  // switch data pins to READ mode
+  _changeDataPinsMode(_DataPinsMode::DATA_PINS_READ);
 }
 
 uint8_t Eeprom28C64Api::readData(const uint16_t address) {
@@ -183,42 +180,51 @@ uint8_t Eeprom28C64Api::readData(const uint16_t address) {
     return 0;
   }
 
+  bool bData[_EEPROM_28C64_DATA_BUS_SIZE];
+
+  // (0) prepare inputs
   // convert address to bits
   bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
   uint64ToBits((uint64_t)address, bAddress, _EEPROM_28C64_ADDR_BUS_SIZE);
 
-  // set address
+  // (1) set address
   _debugPrint("(API) R [" + String(address) + "] | addr: b");
   for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
     digitalWrite(_addressPins[i], bAddress[i]);
     _debugPrint(bAddress[i]);
   }
 
-  // output enable
-  _outputEnable(true);
+  // (2) chip enable
+  digitalWrite(_chipEnablePin, LOW);
 
-  // read output by address
-  bool bData[_EEPROM_28C64_DATA_BUS_SIZE];
-  _debugPrint("| data: b");
+  // (3) output enable
+  digitalWrite(_outputEnablePin, LOW);
+
+  // (4) read data
+  _debugPrint(" | data: b");
   for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
     bData[i] = digitalRead(_dataPins[i]) ? 1 : 0;
     _debugPrint(bData[i]);
   }
   _debugPrintln();
 
-  // output disable
-  _outputEnable(false);
+  // (5) output disable
+  digitalWrite(_outputEnablePin, HIGH);
+
+  // (6) chip disable
+  digitalWrite(_chipEnablePin, HIGH);
 
   return (uint8_t)bitsToUint64(bData, _EEPROM_28C64_DATA_BUS_SIZE);
 }
 
 void Eeprom28C64Api::writeInit() {
-  _chipEnable(true);     // always true
-  _outputEnable(false);  // not in use
-  _writeEnable(false);
-  _changeDataPinsMode(_DataPinsMode::DATA_PINS_WRITE);
-
   _writeState = true;
+  // initial WRITE waveforms state (!WE controlled)
+  digitalWrite(_chipEnablePin, HIGH);    // off
+  digitalWrite(_outputEnablePin, HIGH);  // not in use
+  digitalWrite(_writeEnablePin, HIGH);   // off
+  // switch data pins to WRITE mode
+  _changeDataPinsMode(_DataPinsMode::DATA_PINS_WRITE);
 }
 
 void Eeprom28C64Api::writeData(const uint16_t address, const uint8_t data) {
@@ -226,64 +232,49 @@ void Eeprom28C64Api::writeData(const uint16_t address, const uint8_t data) {
     return;
   }
 
+  // (0) prepare inputs
   // convert address to bits
   bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
   uint64ToBits((uint64_t)address, bAddress, _EEPROM_28C64_ADDR_BUS_SIZE);
-
   // convert data to bits
   bool bData[_EEPROM_28C64_DATA_BUS_SIZE];
   uint64ToBits((uint64_t)data, bData, _EEPROM_28C64_DATA_BUS_SIZE);
 
-  // set address
+  // (1) set address
   _debugPrint("(API) W [" + String(address) + "] | addr: b");
   for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
     digitalWrite(_addressPins[i], bAddress[i]);
     _debugPrint(bAddress[i]);
   }
 
-  // wrtie enable
-  _writeEnable(true);
+  // (2) chip enable
+  digitalWrite(_chipEnablePin, LOW);
 
-  // set data
-  _debugPrint("| data: b");
+  // (3) wrtie enable
+  digitalWrite(_writeEnablePin, LOW);
+
+  // (4) write data
+  _debugPrint(" | data: b");
   for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
     digitalWrite(_dataPins[i], bData[i]);
     _debugPrint(bData[i]);
   }
   _debugPrintln();
 
-  // wrtie disable (initiates the data flush)
-  _writeEnable(false);
+  // (5) wrtie disable (initiates the data flush)
+  digitalWrite(_writeEnablePin, HIGH);
 
-  // wait until !BUSY state switches to READY state
+  // (6) chip disable
+  digitalWrite(_chipEnablePin, HIGH);
+
+  // (7) time to device !BUSY state (50 ms MAX)
+  delayMicroseconds(1);  // arduino cannot delay in ns, only us
+
+  // wait until !BUSY state switches to READY state (1 ms MAX)
   int busyStateStart = micros();
   // while (digitalRead(_readyBusyOutputPin) == LOW) {}
-  delay(4);
+  delay(2);  // 1 ms is not enough
   _busyStateUsec = micros() - busyStateStart;
-}
-
-void Eeprom28C64Api::_chipEnable(const bool enable) {
-  if (enable) {
-    digitalWrite(_chipEnablePin, LOW);
-  } else {
-    digitalWrite(_chipEnablePin, HIGH);
-  }
-}
-
-void Eeprom28C64Api::_outputEnable(const bool enable) {
-  if (enable) {
-    digitalWrite(_outputEnablePin, LOW);
-  } else {
-    digitalWrite(_outputEnablePin, HIGH);
-  }
-}
-
-void Eeprom28C64Api::_writeEnable(const bool enable) {
-  if (enable) {
-    digitalWrite(_writeEnablePin, LOW);
-  } else {
-    digitalWrite(_writeEnablePin, HIGH);
-  }
 }
 
 }  // EepromApiLibrary
