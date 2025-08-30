@@ -139,8 +139,8 @@ void Eeprom28C64Api::_changeDataPinsMode(const Eeprom28C64Api::_DataPinsMode mod
 }
 
 void Eeprom28C64Api::init() {
-  // status pin
-  pinMode(_readyBusyOutputPin, INPUT);
+  // status pin / open drain
+  pinMode(_readyBusyOutputPin, INPUT_PULLUP);
 
   // control pins
   pinMode(_chipEnablePin, OUTPUT);
