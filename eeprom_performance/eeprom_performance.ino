@@ -89,13 +89,13 @@ void loop() {
     uint8_t data = (uint8_t)random(1, 255);
     // uint8_t data = (uint8_t)op_write;
 
-    writeValues[op_write] = data;
+    writeValues[USABLE_ADDRESS_OFFSET + op_write] = data;
 
     int write_start = micros();
     eeprom28C64Api.writeData(address, data);
     write_total_micros += micros() - write_start;
 
-    busyStateUsec[op_write] = eeprom28C64Api.busyStateUsec();
+    busyStateUsec[USABLE_ADDRESS_OFFSET + op_write] = eeprom28C64Api.busyStateUsec();
 
     // Serial.println("W [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
 
@@ -124,7 +124,7 @@ void loop() {
     uint8_t data = eeprom28C64Api.readData(address);
     read_total_micros += micros() - read_start;
 
-    readValues[op_read] = data;
+    readValues[USABLE_ADDRESS_OFFSET + op_read] = data;
 
     // Serial.println("R [" + String(address) + "] addr: " + getAddressStr(address) + " | data: " + getDataStr(data));
 
@@ -144,7 +144,7 @@ void loop() {
     op_verify = false;
 
     // check damaged cells
-    for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
+    for (int i = USABLE_ADDRESS_OFFSET; i < USABLE_ADDRESS_OFFSET + USABLE_ADDRESS_SPACE_SIZE; i++) {
       if (writeValues[i] != readValues[i]) {
         damagedCells[i] = true;
         damagedCellsTotal += 1;
@@ -154,7 +154,7 @@ void loop() {
 
     int busyStateUsecTotal = 0;
     int busyStateUsecMax = 0;
-    for (int i = 0; i < USABLE_ADDRESS_SPACE_SIZE; i++) {
+    for (int i = USABLE_ADDRESS_OFFSET; i < USABLE_ADDRESS_OFFSET + USABLE_ADDRESS_SPACE_SIZE; i++) {
       busyStateUsecTotal += busyStateUsec[i];
       busyStateUsecMax = max(busyStateUsecMax, busyStateUsec[i]);
     }
