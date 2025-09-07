@@ -1,4 +1,4 @@
-# EEPROM 28C64 API
+# [WIP] EEPROM 28C64 API for Arduino
 
 ## Init
 
