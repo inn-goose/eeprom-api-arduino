@@ -7,19 +7,22 @@ from serial_json_rpc import client
 
 
 class Method(Enum):
-    LED_ON = "led_on"
-    LED_OFF = "led_off"
+    READ = "read"
 
     def __str__(self):
         return self.value
 
 
 def execute_method(json_rpc_client: client.SerialJsonRpcClient, method: str) -> str:
-    if method == Method.LED_ON:
-        return json_rpc_client.send_request("set_builtin_led", [1])
+    if method == Method.READ:
+        resp = json_rpc_client.send_request("init_read", ["AT28C64"])
+        print("init_read:", resp)
 
-    elif method == Method.LED_OFF:
-        return json_rpc_client.send_request("set_builtin_led", [0])
+        for i in range(4):
+            resp = json_rpc_client.send_request("read_page", [16, i])
+            print(f"read_page [{i}]: {resp}")
+
+        return "OK"
 
     else:
         raise Exception(f"unknown method: {method}")
