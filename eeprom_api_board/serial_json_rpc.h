@@ -13,10 +13,9 @@ public:
   void init();
   void loop();
 
-  void send_result(int id, const char* result_message);
+  void send_result_string(int id, const char* string);
+  void send_result_bytes(int id, uint8_t* buffer, int buffer_size);
   void send_error(int id, int error_code, const char* error_message, const char* error_data);
-
-  String convert_bytes_array_to_json(const uint8_t* buffer, int buffer_size);
 
 private:
   // default baudrate
@@ -29,7 +28,10 @@ private:
   // use \n for simiplicity to use both py-client and Arduino Serial Monitor
   static const char _END_OF_JSON_RPC_MESSAGE = '\n';
 
-  void SerialJsonRpcBoard::_process_request(JsonDocument& request);
+  void _process_request(JsonDocument& request);
+
+  DynamicJsonDocument _get_response(int id, int data_size);
+  void _send_response(const DynamicJsonDocument &response);
 
   int baudrate;
 
@@ -78,23 +80,33 @@ void SerialJsonRpcBoard::loop() {
   }
 }
 
-void SerialJsonRpcBoard::send_result(int id, const char* result_message) {
-  // {"jsonrpc":"2.0","id":-,"result":""}
-  // base lenght is 36
-  // +10 for ID (max signed 32 len)
-  // 46 in total
-  DynamicJsonDocument response(46 + strlen(result_message));
-  response["jsonrpc"] = "2.0";
-  response["id"] = id;
+void SerialJsonRpcBoard::send_result_string(int id, const char* string) {
+  // string len + "" (2)
+  int data_size = strlen(string) + 2;
+  DynamicJsonDocument response = _get_response(id, data_size);
 
-  response["result"] = result_message;
+  DynamicJsonDocument result(data_size);
+  JsonVariant result_data = result.to<JsonVariant>();
+  result_data.set(String(string));
+  response["result"] = result_data;
 
-  serializeJson(response, Serial);
-  response.clear();
-  response.garbageCollect();
+  _send_response(response);
+}
 
-  Serial.write(_END_OF_JSON_RPC_MESSAGE);
-  Serial.flush();
+void SerialJsonRpcBoard::send_result_bytes(int id, uint8_t* buffer, int buffer_size) {
+  // max byte = 255 + comma separator == 4
+  // array braces = [] == 2
+  int data_size = 2 + 4 * buffer_size;
+  DynamicJsonDocument response = _get_response(id, data_size);
+
+  DynamicJsonDocument result(data_size);
+  JsonArray arr = result.to<JsonArray>();
+  for (int i = 0; i < buffer_size; i ++) {
+    arr.add(buffer[i]);
+  }
+  response["result"] = result;
+
+  _send_response(response);
 }
 
 void SerialJsonRpcBoard::send_error(int id, int error_code, const char* error_message, const char* error_data) {
@@ -120,15 +132,6 @@ void SerialJsonRpcBoard::send_error(int id, int error_code, const char* error_me
 
   Serial.write(_END_OF_JSON_RPC_MESSAGE);
   Serial.flush();
-}
-
-String SerialJsonRpcBoard::convert_bytes_array_to_json(const uint8_t* buffer, int buffer_size) {
-  String json_data = "[";
-  for (int i = 0; i < buffer_size; i ++) {
-    json_data += String(buffer[i]) + ",";
-  }
-  json_data.setCharAt(json_data.length() - 1, ']');
-  return json_data;
 }
 
 void SerialJsonRpcBoard::_process_request(JsonDocument& request) {
@@ -157,6 +160,27 @@ void SerialJsonRpcBoard::_process_request(JsonDocument& request) {
   }
 
   rpc_processor_callback(request_id, method, params_array, params_size);
+}
+
+DynamicJsonDocument SerialJsonRpcBoard::_get_response(int id, int data_size) {
+  // {"jsonrpc":"2.0","id":-,"result":-}
+  // base lenght is 36
+  // +10 for ID (max signed 32 len)
+  // 45 in total
+  // +10 buffer
+  DynamicJsonDocument response(45 + data_size + 10);
+  response["jsonrpc"] = "2.0";
+  response["id"] = id;
+  return response;
+}
+
+void SerialJsonRpcBoard::_send_response(const DynamicJsonDocument &response) {
+  serializeJson(response, Serial);
+  response.clear();
+  response.garbageCollect();
+
+  Serial.write(_END_OF_JSON_RPC_MESSAGE);
+  Serial.flush();
 }
 
 }

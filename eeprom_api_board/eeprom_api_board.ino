@@ -36,7 +36,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 
     eeprom_api.readInit();
 
-    rpc_board.send_result(request_id, "OK. Initialized");
+    rpc_board.send_result_string(request_id, "OK. Initialized");
 
   } else if (method == "read_page") {
     if (params_size != 2) {
@@ -54,8 +54,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       buffer[i] = start + i;
     }
     
-    String json_data = rpc_board.convert_bytes_array_to_json(buffer, page_size_bytes);
-    rpc_board.send_result(request_id, json_data.c_str());
+    rpc_board.send_result_bytes(request_id, buffer, page_size_bytes);
 
   } else {
     rpc_board.send_error(request_id, -32601, "Method not found", method.c_str());
