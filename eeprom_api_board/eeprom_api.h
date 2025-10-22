@@ -42,31 +42,27 @@ public:
     return _busyStateUsec;
   }
 
-  // bit operations
-  // Most Significant Bit First ordering
-  // { 0,0,0,0,0,0,0,1 } == 1
-  // { 1,0,0,0,0,0,0,0 } == 128
-
-  static void uint64ToBits(uint64_t value, bool* bitsArray, const int arraySize) {
-    // reverse order
-    for (int i = 0; i < arraySize; i++) {
-      bitsArray[i] = bitRead(value, arraySize - 1 - i);
+  static String addressBin(const uint16_t address) {
+    bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
+    _addressToBitsArray(address, bAddress);
+    String result = "";
+    for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
+      // print in reverse order, since the printed A0 should be the last bit
+      result += bAddress[_EEPROM_28C64_ADDR_BUS_SIZE - 1 - i] ? 1 : 0;
     }
+    return result;
   }
 
-  static uint64_t bitsToUint64(bool* bitsArray, const int arraySize) {
-    uint64_t value = 0;
-    for (int i = 0; i < arraySize; i++) {
-      value = (value << 1) | bitsArray[i];
-    }
-    return value;
+  static String addressHex(const uint16_t address) {
+    char buf[8];
+    sprintf(buf, "%08x", address);
+    return String(buf);
   }
 
-  static int addressBusSize() {
-    return _EEPROM_28C64_ADDR_BUS_SIZE;
-  }
-  static int dataBusSize() {
-    return _EEPROM_28C64_DATA_BUS_SIZE;
+  static String dataHex(const uint8_t data) {
+    char buf[2];
+    sprintf(buf, "%02x", data);
+    return String(buf);
   }
 
 private:
@@ -95,6 +91,38 @@ private:
   bool _readState;
   bool _writeState;
   int _busyStateUsec;
+
+  // bit operations
+  // Most Significant Bit First ordering
+  // { 0,0,0,0,0,0,0,1 } == 1
+  // { 1,0,0,0,0,0,0,0 } == 128
+
+  static void _addressToBitsArray(uint16_t address, bool* bitsArray) {
+    // Ensure address is within 13-bit range (0 to 8191)
+    address &= 0x1FFF;
+    for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; ++i) {
+      // MSB order
+      // bitsArray[_EEPROM_28C64_ADDR_BUS_SIZE - 1 - i] = (address >> i) & 1;
+      // LSB order
+      bitsArray[i] = (address >> i) & 1;
+    }
+  }
+
+  static void _dataToBitsArray(uint8_t data, bool* bitsArray) {
+    // MSB order
+    for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
+      bitsArray[_EEPROM_28C64_DATA_BUS_SIZE - 1 - i] = bitRead(data, i);
+    }
+  }
+
+  static uint8_t _bitsArrayToData(bool* bitsArray) {
+    // MSB order
+    uint8_t data = 0;
+    for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
+      data = (data << 1) | bitsArray[_EEPROM_28C64_DATA_BUS_SIZE - 1 - i];
+    }
+    return data;
+  }
 };
 
 EepromApi::EepromApi(
@@ -139,30 +167,29 @@ void EepromApi::_changeDataPinsMode(const EepromApi::_DataPinsMode mode) {
 }
 
 void EepromApi::init() {
-  // status pin / open drain
-  pinMode(_readyBusyOutputPin, INPUT_PULLUP);
-
-  // control pins
+  // set control pins
   pinMode(_chipEnablePin, OUTPUT);
   pinMode(_outputEnablePin, OUTPUT);
   pinMode(_writeEnablePin, OUTPUT);
-
-  // address
-  for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
-    pinMode(_addressPins[i], OUTPUT);
-  }
-
-  _changeDataPinsMode(_DataPinsMode::DATA_PINS_READ);
-
   // disable all control pins
   digitalWrite(_chipEnablePin, HIGH);
   digitalWrite(_outputEnablePin, HIGH);
   digitalWrite(_writeEnablePin, HIGH);
 
-  // set address to 0
+  // address
+  for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
+    pinMode(_addressPins[i], OUTPUT);
+  }
+  // reset address
   for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
     digitalWrite(_addressPins[i], 0);
   }
+
+  _changeDataPinsMode(_DataPinsMode::DATA_PINS_READ);
+
+  // status pin / open drain
+  pinMode(_readyBusyOutputPin, OUTPUT);
+  digitalWrite(_readyBusyOutputPin, LOW);
 }
 
 void EepromApi::readInit() {
@@ -173,6 +200,10 @@ void EepromApi::readInit() {
   digitalWrite(_writeEnablePin, HIGH);   // not in use
   // switch data pins to READ mode
   _changeDataPinsMode(_DataPinsMode::DATA_PINS_READ);
+
+  // status pin / NC
+  pinMode(_readyBusyOutputPin, OUTPUT);
+  digitalWrite(_readyBusyOutputPin, LOW);
 }
 
 uint8_t EepromApi::readData(const uint16_t address) {
@@ -185,10 +216,10 @@ uint8_t EepromApi::readData(const uint16_t address) {
   // (0) prepare inputs
   // convert address to bits
   bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
-  uint64ToBits((uint64_t)address, bAddress, _EEPROM_28C64_ADDR_BUS_SIZE);
+  _addressToBitsArray(address, bAddress);
 
   // (1) set address
-  _debugPrint("(API) R [" + String(address) + "] | addr: b");
+  _debugPrint("(API) R [" + String(address) + "] | addr[LSB]: b");
   for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
     digitalWrite(_addressPins[i], bAddress[i]);
     _debugPrint(bAddress[i]);
@@ -201,12 +232,12 @@ uint8_t EepromApi::readData(const uint16_t address) {
   digitalWrite(_outputEnablePin, LOW);
 
   // (4) !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
-  // delayMicroseconds(1);  // arduino cannot delay in ns, only us
+  delayMicroseconds(1);  // arduino cannot delay in ns, only us
 
   // (5) read data
-  _debugPrint(" | data: b");
+  _debugPrint(" | data[LSB]: b");
   for (int i = 0; i < _EEPROM_28C64_DATA_BUS_SIZE; i++) {
-    bData[i] = digitalRead(_dataPins[i]) ? 1 : 0;
+    bData[i] = digitalRead(_dataPins[i]) == HIGH ? 1 : 0;
     _debugPrint(bData[i]);
   }
   _debugPrintln();
@@ -217,17 +248,27 @@ uint8_t EepromApi::readData(const uint16_t address) {
   // (7) chip disable
   digitalWrite(_chipEnablePin, HIGH);
 
-  return (uint8_t)bitsToUint64(bData, _EEPROM_28C64_DATA_BUS_SIZE);
+  // (8) reset address
+  for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
+    digitalWrite(_addressPins[i], 0);
+  }
+
+  return _bitsArrayToData(bData);
 }
 
 void EepromApi::writeInit() {
   _writeState = true;
+
   // initial WRITE waveforms state (!WE controlled)
   digitalWrite(_chipEnablePin, HIGH);    // off
   digitalWrite(_outputEnablePin, HIGH);  // not in use
   digitalWrite(_writeEnablePin, HIGH);   // off
+
   // switch data pins to WRITE mode
   _changeDataPinsMode(_DataPinsMode::DATA_PINS_WRITE);
+
+  // status pin / read status / open drain
+  pinMode(_readyBusyOutputPin, INPUT_PULLUP);
 }
 
 void EepromApi::writeData(const uint16_t address, const uint8_t data) {
@@ -238,10 +279,10 @@ void EepromApi::writeData(const uint16_t address, const uint8_t data) {
   // (0) prepare inputs
   // convert address to bits
   bool bAddress[_EEPROM_28C64_ADDR_BUS_SIZE];
-  uint64ToBits((uint64_t)address, bAddress, _EEPROM_28C64_ADDR_BUS_SIZE);
+  _addressToBitsArray(address, bAddress);
   // convert data to bits
   bool bData[_EEPROM_28C64_DATA_BUS_SIZE];
-  uint64ToBits((uint64_t)data, bData, _EEPROM_28C64_DATA_BUS_SIZE);
+  _dataToBitsArray(data, bData);
 
   // (1) set address
   _debugPrint("(API) W [" + String(address) + "] | addr: b");
@@ -297,6 +338,11 @@ void EepromApi::writeData(const uint16_t address, const uint8_t data) {
     // device not in !BUSY state
     // use generic delay
     delayMicroseconds(totalDelayMsec);
+  }
+
+  // (8) reset address
+  for (int i = 0; i < _EEPROM_28C64_ADDR_BUS_SIZE; i++) {
+    digitalWrite(_addressPins[i], 0);
   }
 
   _busyStateUsec = micros() - busyStateStart;
