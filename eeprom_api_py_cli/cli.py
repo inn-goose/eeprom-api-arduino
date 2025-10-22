@@ -13,14 +13,28 @@ class Method(Enum):
         return self.value
 
 
+def to_ascii(val):
+    if (val >= 33 and val <= 126) or val == 20:
+        return chr(val)
+    return '.'
+
+
 def execute_method(json_rpc_client: client.SerialJsonRpcClient, method: str) -> str:
     if method == Method.READ:
         resp = json_rpc_client.send_request("init_read", ["AT28C64"])
-        print("init_read:", resp)
+        # print("init_read:", resp)
 
-        for i in range(4):
+        memory_size = 8192
+        page_size = 16
+        pages_total = int(memory_size / page_size)
+
+        for i in range(pages_total):
             resp = json_rpc_client.send_request("read_page", [16, i])
-            print(f"read_page [{i}]: {resp}")
+            address = page_size * i
+            hex = "".join([f"{r:02x}" + (" " if (n % 2 == 1) else "")
+                          for (n, r) in enumerate(resp)])
+            ascii = "".join([to_ascii(r) for r in resp])
+            print(f"{address:08x}: {hex}{ascii}")
 
         return "OK"
 

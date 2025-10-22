@@ -81,8 +81,9 @@ void SerialJsonRpcBoard::loop() {
 }
 
 void SerialJsonRpcBoard::send_result_string(int id, const char* string) {
+  // >"result":< == 9
   // string len + "" (2)
-  int data_size = strlen(string) + 2;
+  int data_size = 9 + strlen(string) + 2;
   DynamicJsonDocument response = _get_response(id, data_size);
 
   DynamicJsonDocument result(data_size);
@@ -94,9 +95,10 @@ void SerialJsonRpcBoard::send_result_string(int id, const char* string) {
 }
 
 void SerialJsonRpcBoard::send_result_bytes(int id, uint8_t* buffer, int buffer_size) {
-  // max byte = 255 + comma separator == 4
+  // >"result":< == 9
+  // max byte = 255 + comma separator + space == 4
   // array braces = [] == 2
-  int data_size = 2 + 4 * buffer_size;
+  int data_size = 9 + 2 + 4 * buffer_size;
   DynamicJsonDocument response = _get_response(id, data_size);
 
   DynamicJsonDocument result(data_size);
@@ -163,12 +165,12 @@ void SerialJsonRpcBoard::_process_request(JsonDocument& request) {
 }
 
 DynamicJsonDocument SerialJsonRpcBoard::_get_response(int id, int data_size) {
-  // {"jsonrpc":"2.0","id":-,"result":-}
-  // base lenght is 36
+  // {"jsonrpc":"2.0","id":}
+  // base lenght is 24
   // +10 for ID (max signed 32 len)
-  // 45 in total
+  // 34 in total
   // +10 buffer
-  DynamicJsonDocument response(45 + data_size + 10);
+  DynamicJsonDocument response(34 + data_size + 10);
   response["jsonrpc"] = "2.0";
   response["id"] = id;
   return response;

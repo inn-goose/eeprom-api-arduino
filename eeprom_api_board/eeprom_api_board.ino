@@ -50,10 +50,9 @@ void rpc_processor(int request_id, const String &method, const String params[], 
     uint8_t buffer[page_size_bytes];
     const int start = page_size_bytes * page_no;
     for (int i = 0; i < page_size_bytes; i ++) {
-      // buffer[i] = eeprom_api.readData(start + i);
-      buffer[i] = start + i;
+      buffer[i] = eeprom_api.readData(start + i);
     }
-    
+
     rpc_board.send_result_bytes(request_id, buffer, page_size_bytes);
 
   } else {
