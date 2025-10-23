@@ -50,5 +50,20 @@ python -m serial.tools.list_ports
 ...
 /dev/cu.usbmodem2101
 
-PYTHONPATH=./:$PYTHONPATH python3 ./cli.py /dev/cu.usbmodem2101 read
+PYTHONPATH=./eeprom_api_py_cli/:$PYTHONPATH python3 ./eeprom_api_py_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 -r ./dump_eeprom_api.bin
+xxd dump_eeprom_api.bin > dump_eeprom_api.hex
+```
+
+
+## XGecu Programmer as a Reference
+
+```commandline
+brew install minipro
+
+# read
+minipro -p AT28C64 -u -r ./dump_programmer.bin
+xxd dump_programmer.bin > dump_programmer.hex
+
+# compare
+vimdiff dump_eeprom_api.hex dump_programmer.hex
 ```
