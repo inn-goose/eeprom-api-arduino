@@ -3,9 +3,9 @@
 #ifndef __eeprom_programmer_lib_h__
 #define __eeprom_programmer_lib_h__
 
-#include "eeprom_programmer_wiring.h"
+#include "chip_wiring.h"
 
-using namespace EepromProgrammerWiring;
+using namespace ChipWiring;
 
 namespace EepromProgrammerLibrary {
 
@@ -14,7 +14,7 @@ namespace EepromProgrammerLibrary {
 enum ErrorCode : int {
   SUCCESS = 0,
   // connection and pins
-  INVALID_WIRING_TYPE = 11,
+  INVALID_BOARD_WIRING_TYPE = 11,
   PINS_NOT_INITIALIZED = 12,
   // chip
   CHIP_NOT_SUPPORTED = 21,
@@ -39,7 +39,7 @@ enum ErrorCode : int {
 
 class EepromProgrammer {
 public:
-  EepromProgrammer(const WiringType wiring_type);
+  EepromProgrammer(const BoardWiringType board_wiring_type);
 
   // init
   ErrorCode init_programmer();
@@ -131,14 +131,14 @@ private:
   void _data_polling(const unsigned long write_op_start_usec, const uint8_t data);
 
   // wiring controller
-  WiringController _wiring_controller;
+  ChipWiringController _chip_wiring_controller;
 
   // PINS
   // address bus
-  PIN_NO _address_bus_pins[WiringController::MAX_ADDRESS_BUS_SIZE];
+  PIN_NO _address_bus_pins[ChipWiringController::MAX_ADDRESS_BUS_SIZE];
   size_t _address_bus_size;
   // data bus
-  PIN_NO _data_bus_pins[WiringController::MAX_DATA_BUS_SIZE];
+  PIN_NO _data_bus_pins[ChipWiringController::MAX_DATA_BUS_SIZE];
   size_t _data_bus_size;
   // management
   PIN_NO _chip_enable_pin;    // !CE
@@ -200,8 +200,8 @@ private:
   }
 };
 
-EepromProgrammer::EepromProgrammer(const WiringType wiring_type)
-  : _wiring_controller(wiring_type) {
+EepromProgrammer::EepromProgrammer(const BoardWiringType board_wiring_type)
+  : _chip_wiring_controller(board_wiring_type) {
 
   // inner
   _pins_initialized = false;
@@ -226,8 +226,8 @@ EepromProgrammer::EepromProgrammer(const WiringType wiring_type)
 }
 
 ErrorCode EepromProgrammer::init_programmer() {
-  PIN_NO board_bus_pins[WiringController::MAX_BOARD_BUS_SIZE];
-  const size_t board_bus_size = _wiring_controller.get_board_bus_pins(board_bus_pins, WiringController::MAX_BOARD_BUS_SIZE);
+  PIN_NO board_bus_pins[ChipWiringController::MAX_BOARD_BUS_SIZE];
+  const size_t board_bus_size = _chip_wiring_controller.get_board_bus_pins(board_bus_pins, ChipWiringController::MAX_BOARD_BUS_SIZE);
   if (board_bus_size <= 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
@@ -256,13 +256,13 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
     return ErrorCode::CHIP_ALREADY_INITIALIZED;
   }
 
-  _wiring_controller.set_chip_type(str_to_chip_type(chip_type));
-  if (_wiring_controller.get_chip_type() == ChipType::UNKNOWN) {
+  _chip_wiring_controller.set_chip_type(str_to_chip_type(chip_type));
+  if (_chip_wiring_controller.get_chip_type() == ChipType::UNKNOWN) {
     return ErrorCode::CHIP_NOT_SUPPORTED;
   }
 
   // address bus
-  _address_bus_size = _wiring_controller.get_address_bus_pins(_address_bus_pins, WiringController::MAX_ADDRESS_BUS_SIZE);
+  _address_bus_size = _chip_wiring_controller.get_address_bus_pins(_address_bus_pins, ChipWiringController::MAX_ADDRESS_BUS_SIZE);
   if (_address_bus_size <= 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
@@ -273,7 +273,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
   _writeAddress(0);
 
   // data bus
-  _data_bus_size = _wiring_controller.get_data_bus_pins(_data_bus_pins, WiringController::MAX_DATA_BUS_SIZE);
+  _data_bus_size = _chip_wiring_controller.get_data_bus_pins(_data_bus_pins, ChipWiringController::MAX_DATA_BUS_SIZE);
   if (_data_bus_size <= 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
@@ -282,8 +282,8 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
 
   // management pins
   // !CE, !OE, !WE, [!BSY]
-  PIN_NO management_pins[WiringController::MAX_MANAGEMENT_SIZE];
-  const size_t management_size = _wiring_controller.get_management_pins(management_pins, WiringController::MAX_MANAGEMENT_SIZE);
+  PIN_NO management_pins[ChipWiringController::MAX_MANAGEMENT_SIZE];
+  const size_t management_size = _chip_wiring_controller.get_management_pins(management_pins, ChipWiringController::MAX_MANAGEMENT_SIZE);
   if (management_size <= 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }

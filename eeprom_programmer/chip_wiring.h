@@ -1,14 +1,11 @@
-#ifndef __eeprom_programmer_wiring_h__
-#define __eeprom_programmer_wiring_h__
+#ifndef __chip_wiring_h__
+#define __chip_wiring_h__
 
-namespace EepromProgrammerWiring {
+#include "board_wiring.h"
 
-enum WiringType : int {
-  DIP28 = 1,
-  DIP24 = 2,
-  DIP28_SHIFT = 3,
-  DIP24_SHIFT = 4
-};
+using namespace BoardWiring;
+
+namespace ChipWiring {
 
 enum ChipType : int {
   // DIP28
@@ -27,61 +24,6 @@ ChipType str_to_chip_type(const String& chip_type) {
   }
   return ChipType::UNKNOWN;
 }
-
-typedef uint8_t PIN_NO;
-
-
-// ========================================
-// DIP28 WIRING
-// ========================================
-
-// 29  --  1 --|    |-- 28 -- VCC
-// 31  --  2 --|    |-- 27 -- 22
-// 33  --  3 --|    |-- 26 -- 24
-// 35  --  4 --|    |-- 25 -- 26
-// 37  --  5 --|    |-- 24 -- 28
-// 39  --  6 --|    |-- 23 -- 30
-// 41  --  7 --|    |-- 22 -- 32
-// 43  --  8 --|    |-- 21 -- 34
-// 45  --  9 --|    |-- 20 -- 36
-// 47  -- 10 --|    |-- 19 -- 38
-// 49  -- 11 --|    |-- 18 -- 40
-// 51  -- 12 --|    |-- 17 -- 42
-// 53  -- 13 --|    |-- 16 -- 44
-// GND -- 14 --|    |-- 15 -- 46
-
-const PIN_NO DIP28_WIRING[28] = {
-  // left side, 1-14, top-down
-  29,  // 1
-  31,  // 2
-  33,  // 3
-  35,  // 4
-  37,  // 5
-  39,  // 6
-  41,  // 7
-  43,  // 8
-  45,  // 9
-  47,  // 10
-  49,  // 11
-  51,  // 12
-  53,  // 13
-  0,   // 14 / GND
-  // right side, 15-28, bottom-up
-  46,  // 15
-  44,  // 16
-  42,  // 17
-  40,  // 18
-  38,  // 19
-  36,  // 20
-  34,  // 21
-  32,  // 22
-  30,  // 23
-  28,  // 24
-  26,  // 25
-  24,  // 26
-  22,  // 27
-  0,   // 28 / VCC
-};
 
 
 // ========================================
@@ -142,15 +84,15 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27, 0 };  // !C
 };
 
 
-class WiringController {
+class ChipWiringController {
 public:
   static const size_t MAX_BOARD_BUS_SIZE = 28;    // DIP28
   static const size_t MAX_ADDRESS_BUS_SIZE = 15;  // AT28C256: A0 to A14
   static const size_t MAX_DATA_BUS_SIZE = 8;      // AT28C256: I/O0 to I/O7
   static const size_t MAX_MANAGEMENT_SIZE = 4;    // CE, OE, WE, BSY
 
-  WiringController(const WiringType wiring_type)
-    : _wiring_type(wiring_type) {}
+  ChipWiringController(const BoardWiringType board_wiring_type)
+    : _board_wiring_type(board_wiring_type) {}
 
   void set_chip_type(const ChipType chip_type) {
     _chip_type = chip_type;
@@ -163,8 +105,8 @@ public:
     size_t board_bus_size = 0;
     PIN_NO* board_bus_pins = 0;
 
-    switch (_wiring_type) {
-      case WiringType::DIP28:
+    switch (_board_wiring_type) {
+      case BoardWiringType::DIP28:
         board_bus_size = 28;
         board_bus_pins = DIP28_WIRING;
         break;
@@ -191,8 +133,8 @@ public:
     PIN_NO* address_bus_pins = 0;
     PIN_NO* dip_wiring_mapping = 0;
 
-    switch (_wiring_type) {
-      case WiringType::DIP28:
+    switch (_board_wiring_type) {
+      case BoardWiringType::DIP28:
         dip_wiring_mapping = DIP28_WIRING;
         switch (_chip_type) {
           case ChipType::AT28C64:
@@ -234,8 +176,8 @@ public:
     PIN_NO* data_bus_pins = 0;
     PIN_NO* dip_wiring_mapping = 0;
 
-    switch (_wiring_type) {
-      case WiringType::DIP28:
+    switch (_board_wiring_type) {
+      case BoardWiringType::DIP28:
         dip_wiring_mapping = DIP28_WIRING;
         switch (_chip_type) {
           case ChipType::AT28C64:
@@ -277,8 +219,8 @@ public:
     PIN_NO* management_pins = 0;
     PIN_NO* dip_wiring_mapping = 0;
 
-    switch (_wiring_type) {
-      case WiringType::DIP28:
+    switch (_board_wiring_type) {
+      case BoardWiringType::DIP28:
         dip_wiring_mapping = DIP28_WIRING;
         switch (_chip_type) {
           case ChipType::AT28C64:
@@ -316,10 +258,10 @@ public:
   }
 
 private:
-  WiringType _wiring_type;
+  BoardWiringType _board_wiring_type;
   ChipType _chip_type;
 };
 
-}  // EepromProgrammerWiring
+}  // ChipWiring
 
-#endif  // !__eeprom_programmer_wiring_h__
+#endif  // !__chip_wiring_h__

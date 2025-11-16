@@ -1,15 +1,15 @@
-#include "eeprom_programmer_wiring.h"
+#include "board_wiring.h"
 #include "eeprom_programmer_lib.h"
 #include "serial_json_rpc_lib.h"
 
 using namespace EepromProgrammerLibrary;
-using namespace EepromProgrammerWiring;
+using namespace BoardWiring;
 using namespace SerialJsonRpcLibrary;
 
 
 // EEPROM Programmer
 
-static EepromProgrammer eeprom_programmer(WiringType::DIP28);
+static EepromProgrammer eeprom_programmer(BoardWiringType::DIP28);
 
 
 // Serial JSON RPC Processor
