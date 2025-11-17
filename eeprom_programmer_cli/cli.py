@@ -5,7 +5,6 @@ import sys
 import time
 
 from core.eeprom_programmer_client import EepromProgrammerClient
-from serial_json_rpc.client import SerialJsonRpcClient
 
 
 class CliError(Exception):
@@ -17,18 +16,11 @@ def connect_programmer(port: str, baudrate: int, init_timeout: int):
 
     ts = time.time()
 
-    json_rpc_client = SerialJsonRpcClient(
+    programmer = EepromProgrammerClient(
         port=port, baudrate=baudrate, init_timeout=float(init_timeout))
-
-    init_result = json_rpc_client.init()
-    if init_result is not None:
-        print(f"connect programmer: response {init_result}")
 
     elapsed = time.time() - ts
     print(f"connect programmer: DONE, {elapsed:.02f} sec")
-
-    programmer = EepromProgrammerClient(
-        json_rpc_client)
 
     return programmer
 

@@ -35,7 +35,6 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 
     int32_t chip_settings[] = {
       eeprom_programmer.get_memory_size_bytes(),
-      eeprom_programmer.get_max_page_size(),
     };
     rpc_board.send_result_ints(request_id, chip_settings, sizeof(chip_settings) / sizeof(chip_settings[0]));
 
@@ -147,6 +146,11 @@ void setup() {
   rpc_board.init();
   // eeprom programmer
   eeprom_programmer.init_programmer();
+  // eeprom programmer settings
+  int32_t programmer_settings[] = {
+    eeprom_programmer.get_max_page_size(),
+  };
+  rpc_board.send_result_ints(0, programmer_settings, sizeof(programmer_settings) / sizeof(programmer_settings[0]));
 }
 
 void loop() {
