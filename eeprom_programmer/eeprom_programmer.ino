@@ -19,7 +19,7 @@ static SerialJsonRpcBoard rpc_board(rpc_processor);
 void rpc_processor(int request_id, const String &method, const String params[], int params_size) {
   if (method == "init_chip") {
     if (params_size != 1) {
-      rpc_board.send_error(request_id, -32602, "Invalid params", "expected: (chip_type)");
+      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (chip_type)");
       return;
     }
     String chip_type = params[0];
@@ -29,7 +29,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       const size_t error_data_buf_size = 50;
       char error_data_buf[error_data_buf_size];
       snprintf(error_data_buf, error_data_buf_size, "Failed to init %s chip with error: %d", chip_type.c_str(), code);
-      rpc_board.send_error(request_id, -32010, "Service error", error_data_buf);
+      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 10, "Programmer error", error_data_buf);
       return;
     }
 
@@ -40,7 +40,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 
   } else if (method == "set_read_mode") {
     if (params_size != 1) {
-      rpc_board.send_error(request_id, -32602, "Invalid params", "expected: (read_page_size_bytes)");
+      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (read_page_size_bytes)");
       return;
     }
     const int read_page_size_bytes = atoi(params[0].c_str());
@@ -50,7 +50,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       const size_t error_data_buf_size = 70;
       char error_data_buf[error_data_buf_size];
       snprintf(error_data_buf, error_data_buf_size, "Failed to set READ mode for page size %d with error: %d", read_page_size_bytes, code);
-      rpc_board.send_error(request_id, -32020, "Service error", error_data_buf);
+      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 20, "Programmer error", error_data_buf);
       return;
     }
 
@@ -61,7 +61,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 
   } else if (method == "read_page") {
     if (params_size != 1) {
-      rpc_board.send_error(request_id, -32602, "Invalid params", "expected: (page_no)");
+      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (page_no)");
       return;
     }
     const int page_no = atoi(params[0].c_str());
@@ -74,7 +74,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       const size_t error_data_buf_size = 70;
       char error_data_buf[error_data_buf_size];
       snprintf(error_data_buf, error_data_buf_size, "Failed to READ page %d with error: %d", page_no, code);
-      rpc_board.send_error(request_id, -32021, "Service error", error_data_buf);
+      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 21, "Programmer error", error_data_buf);
       return;
     }
 
@@ -82,7 +82,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 
   } else if (method == "set_write_mode") {
     if (params_size != 1) {
-      rpc_board.send_error(request_id, -32602, "Invalid params", "expected: (write_page_size_bytes)");
+      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (write_page_size_bytes)");
       return;
     }
     const int write_page_size_bytes = atoi(params[0].c_str());
@@ -92,7 +92,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       const size_t error_data_buf_size = 70;
       char error_data_buf[error_data_buf_size];
       snprintf(error_data_buf, error_data_buf_size, "Failed to set WRITE mode for page size %d with error: %d", write_page_size_bytes, code);
-      rpc_board.send_error(request_id, -32030, "Service error", error_data_buf);
+      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 30, "Programmer error", error_data_buf);
       return;
     }
 
@@ -103,7 +103,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 
   } else if (method == "write_page") {
     if (params_size != 2) {
-      rpc_board.send_error(request_id, -32602, "Invalid params", "expected: (page_no, bytes_to_write)");
+      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (page_no, bytes_to_write)");
       return;
     }
     const int page_no = atoi(params[0].c_str());
@@ -117,7 +117,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       const size_t error_data_buf_size = 70;
       char error_data_buf[error_data_buf_size];
       snprintf(error_data_buf, error_data_buf_size, "Failed to WRITE page %d with error: %d", page_no, code);
-      rpc_board.send_error(request_id, -32031, "Service error", error_data_buf);
+      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 31, "Programmer error", error_data_buf);
       return;
     }
 
@@ -134,7 +134,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
     rpc_board.send_result_ints(request_id, wait_time_for_page, page_size);
 
   } else {
-    rpc_board.send_error(request_id, -32601, "Method not found", method.c_str());
+    rpc_board.send_error(request_id, JsonRpcErrorCode::METHOD_NOT_FOUND, "Method not found", method.c_str());
   }
 }
 

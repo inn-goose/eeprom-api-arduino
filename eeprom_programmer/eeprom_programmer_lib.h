@@ -3,6 +3,8 @@
 #ifndef __eeprom_programmer_lib_h__
 #define __eeprom_programmer_lib_h__
 
+#include <limits.h>
+
 #include "chip_wiring.h"
 
 using namespace ChipWiring;
@@ -11,7 +13,7 @@ namespace EepromProgrammerLibrary {
 
 // Error Codes
 
-enum ErrorCode : int {
+enum ErrorCode : short {
   SUCCESS = 0,
   // connection and pins
   INVALID_BOARD_WIRING_TYPE = 11,
@@ -31,7 +33,7 @@ enum ErrorCode : int {
   WRITE_MODE_DISABLED = 51,
   WRITE_FAILED = 52,
   // unknown
-  UNKNOWN_ERROR = 1000
+  UNKNOWN_ERROR = SHRT_MAX
 };
 
 

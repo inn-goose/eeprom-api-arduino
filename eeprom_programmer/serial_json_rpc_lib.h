@@ -1,9 +1,25 @@
 #ifndef __serial_json_rpc_lib_h__
 #define __serial_json_rpc_lib_h__
 
+#include <limits.h>
 #include <ArduinoJson.h>
 
 namespace SerialJsonRpcLibrary {
+
+enum JsonRpcErrorCode : short {
+  SUCCESS = 0,
+  // https://www.jsonrpc.org/specification#error_object
+  PARSE_ERROR = -32700,
+  INVALID_REQUEST = -32600,
+  METHOD_NOT_FOUND = -32601,
+  INVALID_PARAMS = -32602,
+  INTERNAL_ERROR = -32603,
+  // server error range: -32000 to -32099
+  SERVER_ERROR = -32000,
+  // unknown
+  UNKNOWN_ERROR = SHRT_MAX
+};
+
 
 class SerialJsonRpcBoard {
 
@@ -65,7 +81,7 @@ void SerialJsonRpcBoard::loop() {
       DeserializationError deserialization_error = deserializeJson(request, serial_read_buffer, serial_read_buffer_pos);
       if (deserialization_error) {
         const char* error_data = deserialization_error.c_str();
-        send_error(0, -32700, "Parse error", error_data);
+        send_error(0, JsonRpcErrorCode::PARSE_ERROR, "Parse error", error_data);
       } else {
         _process_request(request);
       }
@@ -77,7 +93,7 @@ void SerialJsonRpcBoard::loop() {
 
     // buffer overflow
     if (serial_read_buffer_pos >= _JSON_RPC_BUFFER_SIZE) {
-      send_error(0, -32600, "Invalid Request", "JSON RPC message is to large");
+      send_error(0, JsonRpcErrorCode::INVALID_REQUEST, "Invalid Request", "JSON RPC message is to large");
       serial_read_buffer_pos = 0;
       return;
     }
@@ -176,7 +192,7 @@ void SerialJsonRpcBoard::send_error(int id, int error_code, const char* error_me
 void SerialJsonRpcBoard::_process_request(JsonDocument& request) {
   // validata JSON RPC format
   if (!request.containsKey("jsonrpc") || strcmp(request["jsonrpc"], "2.0") != 0) {
-    send_error(0, -32600, "Invalid Request", "Invalid protocol version");
+    send_error(0, JsonRpcErrorCode::INVALID_REQUEST, "Invalid Request", "Invalid protocol version");
     return;
   }
 
@@ -186,7 +202,7 @@ void SerialJsonRpcBoard::_process_request(JsonDocument& request) {
   JsonVariant params = request["params"];
 
   if (!params.is<JsonArray>()) {
-    send_error(request_id, -32602, "Invalid params", "Array expected");
+    send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "Array expected");
     return;
   }
 
