@@ -67,6 +67,15 @@ public:
   ErrorCode write_page(const int page_no, const uint8_t* bytes, const size_t bytes_size);
 
   // debugging
+  void get_read_byte_usec_for_page(unsigned long* read_byte_usec_for_page, const size_t buffer_size) {
+    if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
+      return;
+    }
+    for (int i; i < buffer_size; i++) {
+      read_byte_usec_for_page[i] = _read_byte_usec_for_page[i];
+    }
+  }
+
   void get_write_byte_usec_for_page(unsigned long* write_byte_usec_for_page, const size_t buffer_size) {
     if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
       return;
@@ -154,7 +163,8 @@ private:
   bool _write_mode;
 
   // debugging
-  unsigned long _write_byte_usec_for_page[_MAX_PAGE_SIZE];
+  int _read_byte_usec_for_page[_MAX_PAGE_SIZE];
+  int _write_byte_usec_for_page[_MAX_PAGE_SIZE];
 
   // bit operations
   // Most Significant Bit First ordering
@@ -220,6 +230,7 @@ EepromProgrammer::EepromProgrammer(const BoardWiringType board_wiring_type)
 
   // performance
   for (int i = 0; i < _MAX_PAGE_SIZE; i++) {
+    _read_byte_usec_for_page[i] = 0;
     _write_byte_usec_for_page[i] = 0;
   }
 }
@@ -310,8 +321,8 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
     case ChipType::AT28C64:
       // tune this constant if write is not working
       // if the waiting is insufficient, data propagation may be incomplete
-      // AT28C64 write time is about 400 us
-      // AT28C256 write time is about 6000 us
+      // AT28C64 write time is about 4000 us
+      // AT28C256 write time is about XXXXX us
       _write_polling_time_usec = 20000;
       break;
     case ChipType::AT28C256:
@@ -366,12 +377,14 @@ ErrorCode EepromProgrammer::read_page(const int page_no, uint8_t* bytes) {
 
   const uint32_t start_address = page_no * _page_size_bytes;
   for (int i = 0; i < _page_size_bytes; i++) {
+    const unsigned long read_byte_start_usec = micros();
     uint8_t byte = -1;
     ErrorCode code = _read_byte(start_address + i, byte);
     if (code != ErrorCode::SUCCESS) {
       return ErrorCode::READ_FAILED;
     }
     bytes[i] = byte;
+    _read_byte_usec_for_page[i] = micros() - read_byte_start_usec;
   }
 
   return ErrorCode::SUCCESS;

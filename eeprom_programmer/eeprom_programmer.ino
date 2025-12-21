@@ -126,6 +126,13 @@ void rpc_processor(int request_id, const String &method, const String params[], 
     snprintf(result_buf, result_buf_size, "WRITE success. %d bytes written", json_array_size);
     rpc_board.send_result_string(request_id, result_buf);
 
+  } else if (method == "get_read_perf") {
+    const size_t page_size = eeprom_programmer.get_page_size_bytes();
+    unsigned long wait_time_for_page[page_size];
+    eeprom_programmer.get_read_byte_usec_for_page(wait_time_for_page, page_size);
+
+    rpc_board.send_result_ints(request_id, wait_time_for_page, page_size);
+
   } else if (method == "get_write_perf") {
     const size_t page_size = eeprom_programmer.get_page_size_bytes();
     unsigned long wait_time_for_page[page_size];

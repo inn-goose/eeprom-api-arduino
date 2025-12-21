@@ -36,7 +36,7 @@ def init_device(programmer: EepromProgrammerClient, device: str):
     print(f"init device: DONE")
 
 
-def read(programmer: EepromProgrammerClient, filename: str):
+def read(programmer: EepromProgrammerClient, filename: str, collect_performance: bool):
     if not filename:
         raise CliError("filename is empty")
 
@@ -45,7 +45,7 @@ def read(programmer: EepromProgrammerClient, filename: str):
     ts = time.time()
 
     try:
-        output_data = programmer.read_data()
+        output_data = programmer.read_data(collect_performance)
     except Exception as ex:
         raise CliError(f"read operation: failed, {str(ex)}")
 
@@ -56,7 +56,7 @@ def read(programmer: EepromProgrammerClient, filename: str):
     print(f"read operation: DONE, {elapsed:.02f} sec")
 
 
-def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: str, skip_erase: bool, collect_write_performance: bool):
+def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: str, skip_erase: bool, collect_performance: bool):
     print(f"write operation: {filename}")
 
     if not filename:
@@ -76,14 +76,14 @@ def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: 
             f"WARNING incorrect data size: {len(input_data)} / chip memory size is {memory_size}")
 
     if not skip_erase:
-        erase(programmer, erase_pattern_str, collect_write_performance)
+        erase(programmer, erase_pattern_str, collect_performance)
 
     print("write operation: started")
 
     ts = time.time()
 
     try:
-        programmer.write_data(input_data, collect_write_performance)
+        programmer.write_data(input_data, collect_performance)
     except Exception as ex:
         raise CliError(f"write operation: failed, {str(ex)}")
 
@@ -91,7 +91,7 @@ def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: 
     print(f"write operation: DONE, {elapsed:.02f} sec")
 
 
-def verify(programmer: EepromProgrammerClient, filename: str):
+def verify(programmer: EepromProgrammerClient, filename: str, collect_performance: bool):
     print(f"verify operation: {filename}")
 
     if not filename:
@@ -115,10 +115,10 @@ def verify(programmer: EepromProgrammerClient, filename: str):
     ts = time.time()
 
     try:
-        output_data = programmer.read_data()
+        output_data = programmer.read_data(collect_performance)
     except Exception as ex:
         raise CliError(f"read operation: failed, {str(ex)}")
-    
+
     if input_data != output_data:
         raise CliError(f"verify operation: failed, mismatched data")
 
@@ -126,7 +126,7 @@ def verify(programmer: EepromProgrammerClient, filename: str):
     print(f"verify operation: DONE, {elapsed:.02f} sec")
 
 
-def erase(programmer: EepromProgrammerClient, erase_pattern_str: str, collect_write_performance: bool):
+def erase(programmer: EepromProgrammerClient, erase_pattern_str: str, collect_performance: bool):
     print("erase operation")
 
     erase_pattern = 255  # FF
@@ -145,7 +145,7 @@ def erase(programmer: EepromProgrammerClient, erase_pattern_str: str, collect_wr
     ts = time.time()
 
     try:
-        programmer.erase_data(erase_pattern, collect_write_performance)
+        programmer.erase_data(erase_pattern, collect_performance)
     except Exception as ex:
         raise CliError(f"erase operation: failed, {str(ex)}")
 
@@ -178,8 +178,8 @@ def cli() -> int:
                         help="Just erase the device")
     parser.add_argument("--erase-pattern", type=str, required=False, metavar="<hex>",
                         help="Specify the erase pattern, like CC or AA, default: FF")
-    parser.add_argument("--collect-write-performance", action="store_true",
-                        help="Collect the write operation performance")
+    parser.add_argument("--collect-performance", action="store_true",
+                        help="Collect the operation performance")
     args = parser.parse_args()
 
     if args.list:
@@ -196,17 +196,17 @@ def cli() -> int:
     init_device(programmer, args.device)
 
     if args.read is not None:
-        read(programmer, args.read)
+        read(programmer, args.read, args.collect_performance)
 
     elif args.write is not None:
         write(programmer, args.write, args.erase_pattern, args.skip_erase,
-              args.collect_write_performance)
+              args.collect_performance)
 
     elif args.verify is not None:
-        verify(programmer, args.verify)
+        verify(programmer, args.verify, args.collect_performance)
 
     elif args.erase:
-        erase(programmer, args.erase_pattern, args.collect_write_performance)
+        erase(programmer, args.erase_pattern, args.collect_performance)
 
     else:
         raise CliError("unknown operation")
