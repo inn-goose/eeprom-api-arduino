@@ -322,7 +322,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
       // tune this constant if write is not working
       // if the waiting is insufficient, data propagation may be incomplete
       // AT28C64 write time is about 4000 us
-      // AT28C256 write time is about XXXXX us
+      // AT28C256 write time is about 6500 us
       _write_polling_time_usec = 20000;
       break;
     case ChipType::AT28C256:
