@@ -244,3 +244,25 @@ vimdiff tmp/dump_eeprom.hex tmp/4_echo_orbit.hex
 # >> set jumper wire
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/4_echo_orbit_AT28C64_ff.bin
 ```
+
+
+
+
+## Performance
+
+```
+source venv/bin/activate
+export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
+
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit_AT28C64_ff.bin --skip-erase
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/4_echo_orbit_AT28C64_ff.bin
+
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --erase --erase-pattern FF
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --read tmp/dump_eeprom.bin
+xxd tmp/dump_eeprom.bin | less
+```
+
+| Chip | Size | Read | Write |
+| -- | :--: | :--: | :--: |
+| AT28C64 | 8192 | 15-20 sec | 50-60 sec |
+| AT28C256 | 32768 | - | - |

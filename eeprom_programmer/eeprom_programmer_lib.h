@@ -61,29 +61,19 @@ public:
   // read
   ErrorCode set_read_mode(const uint32_t page_size_bytes);
   ErrorCode read_page(const int page_no, uint8_t* bytes);
-  ErrorCode read_byte(const uint32_t address, uint8_t& byte);
 
   // write
   ErrorCode set_write_mode(const uint32_t page_size_bytes);
   ErrorCode write_page(const int page_no, const uint8_t* bytes, const size_t bytes_size);
-  ErrorCode write_byte(const uint32_t address, const uint8_t data);
 
   // debugging
-  unsigned long get_write_op_wait_time_usec() {
-    return _write_op_wait_time_usec;
-  }
-
-  void get_write_op_wait_time_usec_for_page(unsigned long* wait_time_for_page, const size_t buffer_size) {
+  void get_write_byte_usec_for_page(unsigned long* write_byte_usec_for_page, const size_t buffer_size) {
     if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
       return;
     }
     for (int i; i < buffer_size; i++) {
-      wait_time_for_page[i] = _write_op_wait_time_usec_for_page[i];
+      write_byte_usec_for_page[i] = _write_byte_usec_for_page[i];
     }
-  }
-
-  int get_write_op_wait_cycles() {
-    return _write_op_wait_cycles;
   }
 
   // helpers
@@ -113,11 +103,8 @@ public:
 private:
   static const uint32_t _MAX_PAGE_SIZE = 64;
 
-  // tune this constant if write is not working
-  // if the waiting is insufficient, data propagation may be incomplete
-  // AT28C64 write time is about 400 us
-  // AT28C256 write time is about 6000 us
-  static const unsigned int _WRITE_SUCCESS_WAITING_TIME_USEC = int(20.0 * 1000);
+  ErrorCode _read_byte(const uint32_t address, uint8_t& byte);
+  ErrorCode _write_byte(const uint32_t address, const uint8_t data);
 
   enum _DataBusMode {
     READ,
@@ -129,8 +116,9 @@ private:
   uint8_t _read_data();
   void _write_data(const uint8_t data);
 
-  void _rdy_busy_polling(const unsigned long write_op_start_usec, const uint8_t data);
-  void _data_polling(const unsigned long write_op_start_usec, const uint8_t data);
+  void _polling(const uint8_t data);
+  void _rdy_busy_polling();
+  void _data_polling(const uint8_t data);
 
   // wiring controller
   ChipWiringController _chip_wiring_controller;
@@ -152,6 +140,13 @@ private:
   bool _pins_initialized;
   bool _chip_ready;
 
+  // chip settings
+  unsigned int _write_polling_time_usec;
+
+  // optimizations
+  bool _current_address[ChipWiringController::MAX_ADDRESS_BUS_SIZE];
+  bool _current_data[ChipWiringController::MAX_ADDRESS_BUS_SIZE];
+
   // modes
   uint32_t _memory_size_bytes;
   uint32_t _page_size_bytes;
@@ -159,14 +154,15 @@ private:
   bool _write_mode;
 
   // debugging
-  unsigned long _write_op_wait_time_usec;
-  unsigned long _write_op_wait_time_usec_for_page[_MAX_PAGE_SIZE];
-  int _write_op_wait_cycles;
+  unsigned long _write_byte_usec_for_page[_MAX_PAGE_SIZE];
 
   // bit operations
   // Most Significant Bit First ordering
   // { 0,0,0,0,0,0,0,1 } == 1
   // { 1,0,0,0,0,0,0,0 } == 128
+  // Less Significant Bit First ordering
+  // { 1,0,0,0,0,0,0,0 } == 1
+  // { 0,0,0,0,0,0,0,1 } == 128
 
   static void _address_to_bits_array(uint32_t address, bool* b_address, const size_t address_bus_size) {
     // ensure address is within the memory size range
@@ -213,6 +209,9 @@ EepromProgrammer::EepromProgrammer(const BoardWiringType board_wiring_type)
   _address_bus_size = 0;
   _data_bus_size = 0;
 
+  // chip settings
+  _write_polling_time_usec = 0;
+
   // mode
   _memory_size_bytes = 0;
   _page_size_bytes = 0;
@@ -220,11 +219,9 @@ EepromProgrammer::EepromProgrammer(const BoardWiringType board_wiring_type)
   _write_mode = false;
 
   // performance
-  _write_op_wait_time_usec = 0;
   for (int i = 0; i < _MAX_PAGE_SIZE; i++) {
-    _write_op_wait_time_usec_for_page[i] = 0;
+    _write_byte_usec_for_page[i] = 0;
   }
-  _write_op_wait_cycles = -1;
 }
 
 ErrorCode EepromProgrammer::init_programmer() {
@@ -250,7 +247,7 @@ ErrorCode EepromProgrammer::init_programmer() {
   return ErrorCode::SUCCESS;
 }
 
-ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
+ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
   if (!_pins_initialized) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
@@ -258,8 +255,9 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
     return ErrorCode::CHIP_ALREADY_INITIALIZED;
   }
 
-  _chip_wiring_controller.set_chip_type(str_to_chip_type(chip_type));
-  if (_chip_wiring_controller.get_chip_type() == ChipType::UNKNOWN) {
+  _chip_wiring_controller.set_chip_type(chip_name_to_type(chip_name));
+  ChipType chip_type = _chip_wiring_controller.get_chip_type();
+  if (chip_type == ChipType::UNKNOWN) {
     return ErrorCode::CHIP_NOT_SUPPORTED;
   }
 
@@ -271,8 +269,6 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
   _memory_size_bytes = (uint32_t)(1) << _address_bus_size;
 
   _set_address_bus_mode();
-  // reset address
-  _write_address(0);
 
   // data bus
   _data_bus_size = _chip_wiring_controller.get_data_bus_pins(_data_bus_pins, ChipWiringController::MAX_DATA_BUS_SIZE);
@@ -307,6 +303,22 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_type) {
   if (_rdy_busy_pin > 0) {
     // open drain
     pinMode(_rdy_busy_pin, INPUT_PULLUP);
+  }
+
+  // chip settings
+  switch (chip_type) {
+    case ChipType::AT28C64:
+      // tune this constant if write is not working
+      // if the waiting is insufficient, data propagation may be incomplete
+      // AT28C64 write time is about 400 us
+      // AT28C256 write time is about 6000 us
+      _write_polling_time_usec = 20000;
+      break;
+    case ChipType::AT28C256:
+      _write_polling_time_usec = 20000;
+      break;
+    default:
+      break;
   }
 
   _chip_ready = true;
@@ -355,50 +367,12 @@ ErrorCode EepromProgrammer::read_page(const int page_no, uint8_t* bytes) {
   const uint32_t start_address = page_no * _page_size_bytes;
   for (int i = 0; i < _page_size_bytes; i++) {
     uint8_t byte = -1;
-    ErrorCode code = read_byte(start_address + i, byte);
+    ErrorCode code = _read_byte(start_address + i, byte);
     if (code != ErrorCode::SUCCESS) {
       return ErrorCode::READ_FAILED;
     }
     bytes[i] = byte;
   }
-
-  return ErrorCode::SUCCESS;
-}
-
-ErrorCode EepromProgrammer::read_byte(const uint32_t address, uint8_t& byte) {
-  if (!_pins_initialized) {
-    return ErrorCode::PINS_NOT_INITIALIZED;
-  }
-  if (!_chip_ready) {
-    return ErrorCode::CHIP_NOT_INITIALIZED;
-  }
-  if (!_read_mode) {
-    return ErrorCode::READ_MODE_DISABLED;
-  }
-  if (address < 0 || address >= _memory_size_bytes) {
-    return ErrorCode::INVALID_ADDRESS;
-  }
-
-  // (1) set address
-  _write_address(address);
-
-  // (2) chip enable
-  digitalWrite(_chip_enable_pin, LOW);
-
-  // (3) output enable
-  digitalWrite(_output_enable_pin, LOW);
-
-  // (4) !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
-  delayMicroseconds(1);  // arduino cannot delay in ns, only us
-
-  // (5) read data
-  byte = _read_data();
-
-  // (6) output disable
-  digitalWrite(_output_enable_pin, HIGH);
-
-  // (7) chip disable
-  digitalWrite(_chip_enable_pin, HIGH);
 
   return ErrorCode::SUCCESS;
 }
@@ -447,26 +421,19 @@ ErrorCode EepromProgrammer::write_page(const int page_no, const uint8_t* bytes, 
 
   const uint32_t start_address = page_no * _page_size_bytes;
   for (int i = 0; i < bytes_size; i++) {
-    ErrorCode code = write_byte(start_address + i, bytes[i]);
+    const unsigned long write_byte_start_usec = micros();
+    ErrorCode code = _write_byte(start_address + i, bytes[i]);
     if (code != ErrorCode::SUCCESS) {
       return ErrorCode::WRITE_FAILED;
     }
-    _write_op_wait_time_usec_for_page[i] = _write_op_wait_time_usec;
+    _polling(bytes[i]);
+    _write_byte_usec_for_page[i] = micros() - write_byte_start_usec;
   }
 
   return ErrorCode::SUCCESS;
 }
 
-ErrorCode EepromProgrammer::write_byte(const uint32_t address, const uint8_t data) {
-  if (!_pins_initialized) {
-    return ErrorCode::PINS_NOT_INITIALIZED;
-  }
-  if (!_chip_ready) {
-    return ErrorCode::CHIP_NOT_INITIALIZED;
-  }
-  if (!_write_mode) {
-    return ErrorCode::WRITE_MODE_DISABLED;
-  }
+ErrorCode EepromProgrammer::_read_byte(const uint32_t address, uint8_t& byte) {
   if (address < 0 || address >= _memory_size_bytes) {
     return ErrorCode::INVALID_ADDRESS;
   }
@@ -477,27 +444,45 @@ ErrorCode EepromProgrammer::write_byte(const uint32_t address, const uint8_t dat
   // (2) chip enable
   digitalWrite(_chip_enable_pin, LOW);
 
-  // (3) wrtie enable
-  digitalWrite(_write_enable_pin, LOW);
+  // (3) output enable
+  digitalWrite(_output_enable_pin, LOW);
 
-  // (4) write data
+  // (4) !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
+  delayMicroseconds(1);  // arduino cannot delay in ns, only us
+
+  // (5) read data
+  byte = _read_data();
+
+  // (6) output disable
+  digitalWrite(_output_enable_pin, HIGH);
+
+  // (7) chip disable
+  digitalWrite(_chip_enable_pin, HIGH);
+
+  return ErrorCode::SUCCESS;
+}
+
+ErrorCode EepromProgrammer::_write_byte(const uint32_t address, const uint8_t data) {
+  if (address < 0 || address >= _memory_size_bytes) {
+    return ErrorCode::INVALID_ADDRESS;
+  }
+
+  // (1) set address
+  _write_address(address);
+
+  // (2) set data
   _write_data(data);
+
+  // (3) chip enable
+  digitalWrite(_chip_enable_pin, LOW);
+
+  // (4) wrtie enable
+  digitalWrite(_write_enable_pin, LOW);
 
   // (5) wrtie disable (initiates the data flush)
   digitalWrite(_write_enable_pin, HIGH);
 
-  // (6) polling
-  const unsigned long write_op_start_usec = micros();
-  _write_op_wait_time_usec = 0;
-  _write_op_wait_cycles = -1;
-  if (_rdy_busy_pin > 0) {
-    _rdy_busy_polling(write_op_start_usec, data);
-  } else {
-    _data_polling(write_op_start_usec, data);
-  }
-  _write_op_wait_time_usec = micros() - write_op_start_usec;
-
-  // (7) chip disable
+  // (6) chip disable
   digitalWrite(_chip_enable_pin, HIGH);
 
   return ErrorCode::SUCCESS;
@@ -506,6 +491,8 @@ ErrorCode EepromProgrammer::write_byte(const uint32_t address, const uint8_t dat
 void EepromProgrammer::_set_address_bus_mode() {
   for (int i = 0; i < _address_bus_size; i++) {
     pinMode(_address_bus_pins[i], OUTPUT);
+    digitalWrite(_address_bus_pins[i], 0);
+    _current_address[i] = 0;
   }
 }
 
@@ -518,6 +505,8 @@ void EepromProgrammer::_set_data_bus_mode(const EepromProgrammer::_DataBusMode m
   } else if (mode == EepromProgrammer::_DataBusMode::WRITE) {
     for (int i = 0; i < _data_bus_size; i++) {
       pinMode(_data_bus_pins[i], OUTPUT);
+      digitalWrite(_data_bus_pins[i], 0);
+      _current_data[i] = 0;
     }
   }
 }
@@ -527,7 +516,10 @@ void EepromProgrammer::_write_address(const uint32_t address) {
   bool b_address[c_address_bus_size];
   _address_to_bits_array(address, b_address, c_address_bus_size);
   for (int i = 0; i < c_address_bus_size; i++) {
-    digitalWrite(_address_bus_pins[i], b_address[i]);
+    if (_current_address[i] != b_address[i]) {
+      digitalWrite(_address_bus_pins[i], b_address[i]);
+      _current_address[i] = b_address[i];
+    }
   }
 }
 
@@ -545,11 +537,24 @@ void EepromProgrammer::_write_data(const uint8_t data) {
   bool b_data[c_data_bus_size];
   _data_to_bits_array(data, b_data, c_data_bus_size);
   for (int i = 0; i < c_data_bus_size; i++) {
-    digitalWrite(_data_bus_pins[i], b_data[i]);
+    if (_current_data[i] != b_data[i]) {
+      digitalWrite(_data_bus_pins[i], b_data[i]);
+      _current_data[i] = b_data[i];
+    }
   }
 }
 
-void EepromProgrammer::_rdy_busy_polling(const unsigned long write_op_start_usec, const uint8_t data) {
+void EepromProgrammer::_polling(const uint8_t data) {
+  if (_rdy_busy_pin > 0) {
+    _rdy_busy_polling();
+  } else {
+    _data_polling(data);
+  }
+}
+
+void EepromProgrammer::_rdy_busy_polling() {
+  const unsigned long polling_start_usec = micros();
+
   // wait until device switches to !BUSY state, if chip has the RDY/!BUSY pin
   // Time to Device Busy (delta between WE and !BUSY) == 50 ms MAX (spec)
   delayMicroseconds(1);  // arduino cannot delay in ns, only us
@@ -560,13 +565,11 @@ void EepromProgrammer::_rdy_busy_polling(const unsigned long write_op_start_usec
   if (currBusyState == LOW) {
     // device is in !BUSY state
     // use the READY/!BUSY pin status to wait for the Write Cycle End
-    _write_op_wait_cycles = 0;
     const unsigned int delay_usec = 100;
 
     int prevBusyState = currBusyState;
-    while (write_op_start_usec + _WRITE_SUCCESS_WAITING_TIME_USEC > micros()) {
+    while (polling_start_usec + _write_polling_time_usec > micros()) {
       delayMicroseconds(delay_usec);
-      _write_op_wait_cycles += 1;
 
       prevBusyState = currBusyState;
       currBusyState = digitalRead(_rdy_busy_pin);
@@ -577,22 +580,22 @@ void EepromProgrammer::_rdy_busy_polling(const unsigned long write_op_start_usec
   } else {
     // device not in !BUSY state
     // use generic delay
-    delayMicroseconds(_WRITE_SUCCESS_WAITING_TIME_USEC);
+    delayMicroseconds(_write_polling_time_usec);
   }
 }
 
-void EepromProgrammer::_data_polling(const unsigned long write_op_start_usec, const uint8_t data) {
+void EepromProgrammer::_data_polling(const uint8_t data) {
+  const unsigned long polling_start_usec = micros();
+
   // use !DATA polling, if chip doesn't have the RDY/!BUSY pin
   // following the data poll waveforms, the data is read in a loop until the value matches the one written
   // during the write procedure, the data pins remain in a metastable state.
   _set_data_bus_mode(_DataBusMode::READ);
 
-  _write_op_wait_cycles = 0;
   const unsigned int delay_usec = 50;
 
-  while (write_op_start_usec + _WRITE_SUCCESS_WAITING_TIME_USEC > micros()) {
+  while (polling_start_usec + _write_polling_time_usec > micros()) {
     delayMicroseconds(delay_usec);
-    _write_op_wait_cycles += 1;
 
     // !DATA polling waveforms require to switch !CE and !OE for every attempt
     digitalWrite(_chip_enable_pin, LOW);

@@ -129,7 +129,7 @@ void rpc_processor(int request_id, const String &method, const String params[], 
   } else if (method == "get_write_perf") {
     const size_t page_size = eeprom_programmer.get_page_size_bytes();
     unsigned long wait_time_for_page[page_size];
-    eeprom_programmer.get_write_op_wait_time_usec_for_page(wait_time_for_page, page_size);
+    eeprom_programmer.get_write_byte_usec_for_page(wait_time_for_page, page_size);
 
     rpc_board.send_result_ints(request_id, wait_time_for_page, page_size);
 

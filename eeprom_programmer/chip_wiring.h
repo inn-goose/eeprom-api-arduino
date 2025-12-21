@@ -14,12 +14,12 @@ enum ChipType : int {
   UNKNOWN = 10000
 };
 
-ChipType str_to_chip_type(const String& chip_type) {
-  String _chip_type = chip_type;
-  _chip_type.toUpperCase();
-  if (_chip_type == "AT28C64") {
+ChipType chip_name_to_type(const String& chip_name) {
+  String _chip_name = chip_name;
+  _chip_name.toUpperCase();
+  if (_chip_name == "AT28C64") {
     return ChipType::AT28C64;
-  } else if (_chip_type == "AT28C256") {
+  } else if (_chip_name == "AT28C256") {
     return ChipType::AT28C256;
   }
   return ChipType::UNKNOWN;
