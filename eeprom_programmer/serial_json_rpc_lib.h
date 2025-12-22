@@ -33,8 +33,8 @@ public:
   void loop();
 
   void send_result_string(int id, const char* string);
-  void send_result_bytes(int id, uint8_t* buffer, int buffer_size);
-  void send_result_ints(int id, int32_t* buffer, int buffer_size);
+  void send_result_bytes(int id, uint8_t* buffer, size_t buffer_size);
+  void send_result_ints(int id, int* buffer, size_t buffer_size);
   void send_error(int id, int error_code, const char* error_message, const char* error_data);
 
   // helpers
@@ -54,7 +54,7 @@ private:
   void _process_request(JsonDocument& request);
 
   DynamicJsonDocument _get_response(int id, int data_size);
-  void _send_response(const DynamicJsonDocument &response);
+  void _send_response(DynamicJsonDocument &response);
 
   int baudrate;
 
@@ -117,7 +117,7 @@ void SerialJsonRpcBoard::send_result_string(int id, const char* string) {
   _send_response(response);
 }
 
-void SerialJsonRpcBoard::send_result_bytes(int id, uint8_t* buffer, int buffer_size) {
+void SerialJsonRpcBoard::send_result_bytes(int id, uint8_t* buffer, size_t buffer_size) {
   // >"result":< == 9
   // max byte = 255 + comma separator + space == 4
   // array braces = [] == 2
@@ -134,7 +134,7 @@ void SerialJsonRpcBoard::send_result_bytes(int id, uint8_t* buffer, int buffer_s
   _send_response(response);
 }
 
-void SerialJsonRpcBoard::send_result_ints(int id, int32_t* buffer, int buffer_size) {
+void SerialJsonRpcBoard::send_result_ints(int id, int* buffer, size_t buffer_size) {
   // >"result":< == 9
   // max byte = minus + 10 digits + comma separator + space == 13
   // array braces = [] == 2
@@ -151,7 +151,7 @@ void SerialJsonRpcBoard::send_result_ints(int id, int32_t* buffer, int buffer_si
   _send_response(response);
 }
 
-static size_t SerialJsonRpcBoard::json_array_to_byte_array(const String& raw_json, uint8_t* byte_array, size_t array_size) {
+size_t SerialJsonRpcBoard::json_array_to_byte_array(const String& raw_json, uint8_t* byte_array, size_t array_size) {
   DynamicJsonDocument json_doc(raw_json.length());
   deserializeJson(json_doc, raw_json);
   JsonArray json_array = json_doc.as<JsonArray>();
@@ -209,7 +209,7 @@ void SerialJsonRpcBoard::_process_request(JsonDocument& request) {
   // convert JsonArray to const String[]
   JsonArray params_json_array = params.as<JsonArray>();
   const size_t params_size = params_json_array.size();
-  const String params_array[params_size];
+  String params_array[params_size];
   for (size_t i = 0; i < params_size; i++) {
     params_array[i] = params_json_array[i].as<String>();
   }
@@ -229,7 +229,7 @@ DynamicJsonDocument SerialJsonRpcBoard::_get_response(int id, int data_size) {
   return response;
 }
 
-void SerialJsonRpcBoard::_send_response(const DynamicJsonDocument &response) {
+void SerialJsonRpcBoard::_send_response(DynamicJsonDocument &response) {
   serializeJson(response, Serial);
   response.clear();
   response.garbageCollect();

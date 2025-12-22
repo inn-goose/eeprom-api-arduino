@@ -67,7 +67,7 @@ public:
   ErrorCode write_page(const int page_no, const uint8_t* bytes, const size_t bytes_size);
 
   // debugging
-  void get_read_byte_usec_for_page(unsigned long* read_byte_usec_for_page, const size_t buffer_size) {
+  void get_read_byte_usec_for_page(unsigned int* read_byte_usec_for_page, const size_t buffer_size) {
     if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
       return;
     }
@@ -76,7 +76,7 @@ public:
     }
   }
 
-  void get_write_byte_usec_for_page(unsigned long* write_byte_usec_for_page, const size_t buffer_size) {
+  void get_write_byte_usec_for_page(unsigned int* write_byte_usec_for_page, const size_t buffer_size) {
     if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
       return;
     }
@@ -163,8 +163,8 @@ private:
   bool _write_mode;
 
   // debugging
-  int _read_byte_usec_for_page[_MAX_PAGE_SIZE];
-  int _write_byte_usec_for_page[_MAX_PAGE_SIZE];
+  unsigned int _read_byte_usec_for_page[_MAX_PAGE_SIZE];
+  unsigned int _write_byte_usec_for_page[_MAX_PAGE_SIZE];
 
   // bit operations
   // Most Significant Bit First ordering
@@ -384,7 +384,7 @@ ErrorCode EepromProgrammer::read_page(const int page_no, uint8_t* bytes) {
       return ErrorCode::READ_FAILED;
     }
     bytes[i] = byte;
-    _read_byte_usec_for_page[i] = micros() - read_byte_start_usec;
+    _read_byte_usec_for_page[i] = (unsigned int)(micros() - read_byte_start_usec);
   }
 
   return ErrorCode::SUCCESS;
@@ -439,8 +439,8 @@ ErrorCode EepromProgrammer::write_page(const int page_no, const uint8_t* bytes, 
     if (code != ErrorCode::SUCCESS) {
       return ErrorCode::WRITE_FAILED;
     }
-    _polling(bytes[i]);
-    _write_byte_usec_for_page[i] = micros() - write_byte_start_usec;
+    // _polling(bytes[i]);
+    _write_byte_usec_for_page[i] = (unsigned int)(micros() - write_byte_start_usec);
   }
 
   return ErrorCode::SUCCESS;
