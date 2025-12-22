@@ -156,13 +156,13 @@ source venv/bin/activate
 export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 
 # write data from file
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit.bin
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin
 
 # skip erase
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit.bin --skip-erase
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --skip-erase
 
 # custom erase pattern
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit.bin --erase-pattern CC
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --erase-pattern CC
 ```
 
 #### verify
@@ -172,7 +172,7 @@ source venv/bin/activate
 export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 
 # read data and verify it against the file
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/4_echo_orbit_AT28C64_ff.bin
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/64_the_red_migration_AT28C64_ff.bin
 ```
 
 
@@ -184,7 +184,6 @@ Use the [`minipro`](https://formulae.brew.sh/formula/minipro) utility to perform
 brew install minipro
 
 # write the "real" dump to the chip
-minipro --device AT28C64 -s -u --write test_bin/4_echo_orbit.bin
 minipro --device AT28C64 -s -u --write test_bin/64_the_red_migration.bin
 minipro --device AT28C256 -s -u --write test_bin/256_the_geometry_of_flight.bin
 
@@ -226,23 +225,23 @@ xxd tmp/dump_eeprom.bin | less
 
 ```bash
 # >> remove jumper wire
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit.bin --erase-pattern BB --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --erase-pattern BB --collect-performance
 
 # >> set jumper wire
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --read tmp/dump_eeprom.bin
 
 xxd tmp/dump_eeprom.bin > tmp/dump_eeprom.hex
-vimdiff tmp/dump_eeprom.hex tmp/4_echo_orbit.hex
+vimdiff tmp/dump_eeprom.hex tmp/64_the_red_migration.hex
 ```
 
 ### verify
 
 ```bash
 # >> remove jumper wire
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit.bin --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --collect-performance
 
 # >> set jumper wire
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/4_echo_orbit_AT28C64_ff.bin
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/64_the_red_migration_AT28C64_ff.bin
 ```
 
 
@@ -257,14 +256,20 @@ export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 # AT28C04
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --erase --erase-pattern 11 --collect-performance
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --write test_bin/4_wings_of_the_cosmos_AT28C04_ff.bin --skip-erase --collect-performance
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --verify test_bin/4_wings_of_the_cosmos_AT28C04_ff.bin --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --write test_bin/4_journey_of_luna_AT28C04_ff.bin --skip-erase --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --verify test_bin/4_journey_of_luna_AT28C04_ff.bin --collect-performance
+
+# AT28C16
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C16 --erase --erase-pattern 11 --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C16 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C16 --write test_bin/16_geese_in_space_AT28C16_ff.bin --skip-erase --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C16 --verify test_bin/16_geese_in_space_AT28C16_ff.bin --collect-performance
 
 # AT28C64
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --erase --erase-pattern 11 --collect-performance
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit_AT28C64_ff.bin --skip-erase --collect-performance
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/4_echo_orbit_AT28C64_ff.bin --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration_AT28C64_ff.bin --skip-erase --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/64_the_red_migration_AT28C64_ff.bin --collect-performance
 
 # AT28C256
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --erase --erase-pattern 11 --collect-performance
@@ -275,6 +280,22 @@ export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 
 | Chip | Size | Byte Read | Total Read | Byte Write | Write |
 | -- | :--: | :--: | :--: | :--: | :--: |
-| AT28C64 | 8192 | 400 ms | 20 sec | 4000 ms | 55 sec |
+| AT28C04 | 512 | 450 ms | 1.5 sec | 950 ms | 2 sec |
+| AT28C16 | 2048 | 450 ms | 6 sec | 3800 ms | 14 sec |
+| AT28C64 | 8192 | 400 ms | 20 sec | 4100 ms | 55 sec |
 | AT28C256 | 32768 | 500 ms | 85 sec | 6500 ms | 300 sec |
-| AT28C04 | 512 | 450 ms | 1.5 sec | 450 ms | 2 sec |
+
+
+## Datasheets
+
+AT28C64
+https://ww1.microchip.com/downloads/en/devicedoc/doc0001H.pdf
+
+AT28C256
+https://ww1.microchip.com/downloads/en/DeviceDoc/doc0006.pdf
+
+AT28C04
+https://www.tvsat.com.pl/pdf/A/at28c04_atm.pdf
+
+AT28C16
+http://cva.stanford.edu/classes/cs99s/datasheets/at28c16.pdf

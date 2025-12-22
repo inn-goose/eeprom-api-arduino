@@ -317,16 +317,21 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
   }
 
   // chip settings
+  // tune this constant if write is not working
+  // if the waiting is insufficient, data propagation may be incomplete
+  // AT28C04 write time is about 950 us
+  // AT28C16 write time is about 3800 us
+  // AT28C64 write time is about 4100 us
+  // AT28C256 write time is about 6500 us
+  _write_polling_time_usec = 20000;
   switch (chip_type) {
+    case ChipType::AT28C04:
+      break;
+    case ChipType::AT28C16:
+      break;
     case ChipType::AT28C64:
-      // tune this constant if write is not working
-      // if the waiting is insufficient, data propagation may be incomplete
-      // AT28C64 write time is about 4000 us
-      // AT28C256 write time is about 6500 us
-      _write_polling_time_usec = 20000;
       break;
     case ChipType::AT28C256:
-      _write_polling_time_usec = 20000;
       break;
     default:
       break;
@@ -439,7 +444,7 @@ ErrorCode EepromProgrammer::write_page(const int page_no, const uint8_t* bytes, 
     if (code != ErrorCode::SUCCESS) {
       return ErrorCode::WRITE_FAILED;
     }
-    // _polling(bytes[i]);
+    _polling(bytes[i]);
     _write_byte_usec_for_page[i] = (unsigned int)(micros() - write_byte_start_usec);
   }
 
