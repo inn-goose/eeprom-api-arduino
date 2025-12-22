@@ -9,7 +9,10 @@ using namespace SerialJsonRpcLibrary;
 
 // EEPROM Programmer
 
-static EepromProgrammer eeprom_programmer(BoardWiringType::DIP28);
+// specify the wiring type here
+// * DIP24
+// * DIP28
+static EepromProgrammer eeprom_programmer(BoardWiringType::DIP24);
 
 
 // Serial JSON RPC Processor

@@ -254,16 +254,27 @@ vimdiff tmp/dump_eeprom.hex tmp/4_echo_orbit.hex
 source venv/bin/activate
 export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 
+# AT28C04
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --erase --erase-pattern 11 --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --write test_bin/4_wings_of_the_cosmos_AT28C04_ff.bin --skip-erase --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --verify test_bin/4_wings_of_the_cosmos_AT28C04_ff.bin --collect-performance
+
+# AT28C64
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --erase --erase-pattern 11 --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/4_echo_orbit_AT28C64_ff.bin --skip-erase --collect-performance
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/4_echo_orbit_AT28C64_ff.bin --collect-performance
 
+# AT28C256
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --erase --erase-pattern 11 --collect-performance
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --read tmp/dump_eeprom.bin
-xxd tmp/dump_eeprom.bin | less
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --write test_bin/256_the_geometry_of_flight_AT28C256_ff.bin --skip-erase --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --verify test_bin/256_the_geometry_of_flight_AT28C256_ff.bin --collect-performance
 ```
 
 | Chip | Size | Byte Read | Total Read | Byte Write | Write |
 | -- | :--: | :--: | :--: | :--: | :--: |
-| AT28C64 | 8192 | 400 ms | 15 sec | 4000 ms | 60 sec |
-| AT28C256 | 32768 | - | - | - | - |
+| AT28C64 | 8192 | 400 ms | 20 sec | 4000 ms | 55 sec |
+| AT28C256 | 32768 | 500 ms | 85 sec | 6500 ms | 300 sec |
+| AT28C04 | 512 | 450 ms | 1.5 sec | 450 ms | 2 sec |

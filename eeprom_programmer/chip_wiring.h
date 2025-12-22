@@ -11,6 +11,9 @@ enum ChipType : int {
   // DIP28
   AT28C64 = 100,
   AT28C256 = 101,
+  // DIP24
+  AT28C04 = 200,
+  // unknown
   UNKNOWN = 10000
 };
 
@@ -21,6 +24,8 @@ ChipType chip_name_to_type(const String& chip_name) {
     return ChipType::AT28C64;
   } else if (_chip_name == "AT28C256") {
     return ChipType::AT28C256;
+  } else if (_chip_name == "AT28C04") {
+    return ChipType::AT28C04;
   }
   return ChipType::UNKNOWN;
 }
@@ -32,7 +37,7 @@ ChipType chip_name_to_type(const String& chip_name) {
 
 // AT28C64 / DIP28
 
-// 1  -- | !BSY  VCC |-- VCC
+// 1  -- | !BSY  VCC |-- 28
 // 2  -- | A12   !WE |-- 27
 // 3  -- | A7    xNC |-- 26
 // 4  -- | A6     A8 |-- 25
@@ -59,7 +64,7 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27, 1 };  // !C
 
 // AT28C256 / DIP28
 
-// 1  -- | A14   VCC |-- VCC
+// 1  -- | A14   VCC |-- 28
 // 2  -- | A12   !WE |-- 27
 // 3  -- | A7    A13 |-- 26
 // 4  -- | A6     A8 |-- 25
@@ -79,8 +84,33 @@ static const size_t ADDRESS_BUS_SIZE = 15;  // A0-A14
 static const PIN_NO ADDRESS_BUS_PINS[ADDRESS_BUS_SIZE] = { 10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 1 };
 static const size_t DATA_BUS_SIZE = 8;
 static const PIN_NO DATA_BUS_PINS[DATA_BUS_SIZE] = { 11, 12, 13, 15, 16, 17, 18, 19 };
-static const size_t MANAGEMENT_SIZE = 4;
-static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27, 0 };  // !CE, !OE, !WE, [!BSY]
+static const size_t MANAGEMENT_SIZE = 3;
+static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27 };  // !CE, !OE, !WE
+};
+
+
+// AT28C04 / DIP24
+
+// 1  -- | A7    VCC |-- 24
+// 2  -- | A6     A8 |-- 23
+// 3  -- | A5     NC |-- 22
+// 4  -- | A4    !WE |-- 21
+// 5  -- | A3    !OE |-- 20
+// 6  -- | A2     NC |-- 19
+// 7  -- | A1    !CE |-- 18
+// 8  -- | A0    IO7 |-- 17
+// 9  -- | IO0   IO6 |-- 16
+// 10 -- | IO1   IO5 |-- 15
+// 11 -- | IO2   IO4 |-- 14
+// 12 -- | GND   IO3 |-- 13
+
+namespace AT28C04_Wiring {
+static const size_t ADDRESS_BUS_SIZE = 9;  // A0-A8
+static const PIN_NO ADDRESS_BUS_PINS[ADDRESS_BUS_SIZE] = { 8, 7, 6, 5, 4, 3, 2, 1, 23 };
+static const size_t DATA_BUS_SIZE = 8;
+static const PIN_NO DATA_BUS_PINS[DATA_BUS_SIZE] = { 9, 10, 11, 13, 14, 15, 16, 17 };
+static const size_t MANAGEMENT_SIZE = 3;
+static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 18, 20, 21 };  // !CE, !OE, !WE
 };
 
 
@@ -103,12 +133,16 @@ public:
 
   size_t get_board_bus_pins(PIN_NO* pins_array, const size_t array_size) {
     size_t board_bus_size = 0;
-    PIN_NO* board_bus_pins = 0;
+    const PIN_NO* board_bus_pins = 0;
 
     switch (_board_wiring_type) {
       case BoardWiringType::DIP28:
         board_bus_size = 28;
         board_bus_pins = DIP28_WIRING;
+        break;
+      case BoardWiringType::DIP24:
+        board_bus_size = 24;
+        board_bus_pins = DIP24_WIRING;
         break;
       default:
         break;
@@ -129,9 +163,9 @@ public:
   }
 
   size_t get_address_bus_pins(PIN_NO* pins_array, const size_t array_size) {
+    const PIN_NO* dip_wiring_mapping = 0;
     size_t address_bus_size = 0;
-    PIN_NO* address_bus_pins = 0;
-    PIN_NO* dip_wiring_mapping = 0;
+    const PIN_NO* address_bus_pins = 0;
 
     switch (_board_wiring_type) {
       case BoardWiringType::DIP28:
@@ -144,6 +178,17 @@ public:
           case ChipType::AT28C256:
             address_bus_size = AT28C256_Wiring::ADDRESS_BUS_SIZE;
             address_bus_pins = AT28C256_Wiring::ADDRESS_BUS_PINS;
+            break;
+          default:
+            break;
+        }
+        break;
+      case BoardWiringType::DIP24:
+        dip_wiring_mapping = DIP24_WIRING;
+        switch (_chip_type) {
+          case ChipType::AT28C04:
+            address_bus_size = AT28C04_Wiring::ADDRESS_BUS_SIZE;
+            address_bus_pins = AT28C04_Wiring::ADDRESS_BUS_PINS;
             break;
           default:
             break;
@@ -172,9 +217,9 @@ public:
   }
 
   size_t get_data_bus_pins(PIN_NO* pins_array, const size_t array_size) {
+    const PIN_NO* dip_wiring_mapping = 0;
     size_t data_bus_size = 0;
-    PIN_NO* data_bus_pins = 0;
-    PIN_NO* dip_wiring_mapping = 0;
+    const PIN_NO* data_bus_pins = 0;
 
     switch (_board_wiring_type) {
       case BoardWiringType::DIP28:
@@ -187,6 +232,17 @@ public:
           case ChipType::AT28C256:
             data_bus_size = AT28C256_Wiring::DATA_BUS_SIZE;
             data_bus_pins = AT28C256_Wiring::DATA_BUS_PINS;
+            break;
+          default:
+            break;
+        }
+        break;
+      case BoardWiringType::DIP24:
+        dip_wiring_mapping = DIP24_WIRING;
+        switch (_chip_type) {
+          case ChipType::AT28C04:
+            data_bus_size = AT28C04_Wiring::DATA_BUS_SIZE;
+            data_bus_pins = AT28C04_Wiring::DATA_BUS_PINS;
             break;
           default:
             break;
@@ -215,9 +271,9 @@ public:
   }
 
   size_t get_management_pins(PIN_NO* pins_array, const size_t array_size) {
+    const PIN_NO* dip_wiring_mapping = 0;
     size_t management_size = 0;
-    PIN_NO* management_pins = 0;
-    PIN_NO* dip_wiring_mapping = 0;
+    const PIN_NO* management_pins = 0;
 
     switch (_board_wiring_type) {
       case BoardWiringType::DIP28:
@@ -230,6 +286,17 @@ public:
           case ChipType::AT28C256:
             management_size = AT28C256_Wiring::MANAGEMENT_SIZE;
             management_pins = AT28C256_Wiring::MANAGEMENT_PINS;
+            break;
+          default:
+            break;
+        }
+        break;
+      case BoardWiringType::DIP24:
+        dip_wiring_mapping = DIP24_WIRING;
+        switch (_chip_type) {
+          case ChipType::AT28C04:
+            management_size = AT28C04_Wiring::MANAGEMENT_SIZE;
+            management_pins = AT28C04_Wiring::MANAGEMENT_PINS;
             break;
           default:
             break;
