@@ -40,21 +40,20 @@ ChipType chip_name_to_type(const String& chip_name) {
 
 // AT28C64 / DIP28
 
-// !BSY -- | 1    28 |--  VCC
-// A12  -- | 2    27 |--  !WE
-// A7   -- | 3    26 |--  xNC
-// A6   -- | 4    25 |--  A8
-// A5   -- | 5    24 |--  A9
-// A4   -- | 6    23 |--  A11
-// A3   -- | 7    22 |--  !OE
-// A2   -- | 8    21 |--  A10
-// A1   -- | 9    20 |--  !CE
-// A0   -- | 10   19 |--  IO7
-// IO0  -- | 11   18 |--  IO6
-// IO1  -- | 12   17 |--  IO5
-// IO2  -- | 13   16 |--  IO4
-// GND  -- | 14   15 |--  IO3
-
+// 1  -- | !BSY  VCC |-- 28
+// 2  -- | A12   !WE |-- 27
+// 3  -- | A7     NC |-- 26
+// 4  -- | A6     A8 |-- 25
+// 5  -- | A5     A9 |-- 24
+// 6  -- | A4    A11 |-- 23
+// 7  -- | A3    !OE |-- 22
+// 8  -- | A2    A10 |-- 21
+// 9  -- | A1    !CE |-- 20
+// 10 -- | A0    IO7 |-- 19
+// 11 -- | IO0   IO6 |-- 18
+// 12 -- | IO1   IO5 |-- 17
+// 13 -- | IO2   IO4 |-- 16
+// 14 -- | GND   IO3 |-- 15
 
 namespace AT28C64_Wiring {
 static const size_t ADDRESS_BUS_SIZE = 13;  // A0-A12
@@ -68,20 +67,20 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27, 1 };  // !C
 
 // AT28C256 / DIP28
 
-// A14  -- | 1    28 |--  VCC
-// A12  -- | 2    27 |--  !WE
-// A7   -- | 3    26 |--  A13
-// A6   -- | 4    25 |--  A8
-// A5   -- | 5    24 |--  A9
-// A4   -- | 6    23 |--  A11
-// A3   -- | 7    22 |--  !OE
-// A2   -- | 8    21 |--  A10
-// A1   -- | 9    20 |--  !CE
-// A0   -- | 10   19 |--  IO7
-// IO0  -- | 11   18 |--  IO6
-// IO1  -- | 12   17 |--  IO5
-// IO2  -- | 13   16 |--  IO4
-// GND  -- | 14   15 |--  IO3
+// 1  -- | A14   VCC |-- 28
+// 2  -- | A12   !WE |-- 27
+// 3  -- | A7    A13 |-- 26
+// 4  -- | A6     A8 |-- 25
+// 5  -- | A5     A9 |-- 24
+// 6  -- | A4    A11 |-- 23
+// 7  -- | A3    !OE |-- 22
+// 8  -- | A2    A10 |-- 21
+// 9  -- | A1    !CE |-- 20
+// 10 -- | A0    IO7 |-- 19
+// 11 -- | IO0   IO6 |-- 18
+// 12 -- | IO1   IO5 |-- 17
+// 13 -- | IO2   IO4 |-- 16
+// 14 -- | GND   IO3 |-- 15
 
 namespace AT28C256_Wiring {
 static const size_t ADDRESS_BUS_SIZE = 15;  // A0-A14
@@ -95,18 +94,18 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27 };  // !CE, 
 
 // AT28C04 / DIP24
 
-// A7   -- | 1    24 |--  VCC
-// A6   -- | 2    23 |--  A8
-// A5   -- | 3    22 |--  xNC
-// A4   -- | 4    21 |--  !WE
-// A3   -- | 5    20 |--  !OE
-// A2   -- | 6    19 |--  xNC
-// A1   -- | 7    18 |--  !CE
-// A0   -- | 8    17 |--  IO7
-// IO0  -- | 9    16 |--  IO6
-// IO1  -- | 10   15 |--  IO5
-// IO2  -- | 11   14 |--  IO4
-// GND  -- | 12   13 |--  IO3
+// 1  -- | A7    VCC |-- 24
+// 2  -- | A6     A8 |-- 23
+// 3  -- | A5     NC |-- 22
+// 4  -- | A4    !WE |-- 21
+// 5  -- | A3    !OE |-- 20
+// 6  -- | A2     NC |-- 19
+// 7  -- | A1    !CE |-- 18
+// 8  -- | A0    IO7 |-- 17
+// 9  -- | IO0   IO6 |-- 16
+// 10 -- | IO1   IO5 |-- 15
+// 11 -- | IO2   IO4 |-- 14
+// 12 -- | GND   IO3 |-- 13
 
 namespace AT28C04_Wiring {
 static const size_t ADDRESS_BUS_SIZE = 9;  // A0-A8
@@ -120,18 +119,18 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 18, 20, 21 };  // !CE, 
 
 // AT28C16 / DIP24
 
-// A7   -- | 1    24 |--  VCC
-// A6   -- | 2    23 |--  A8
-// A5   -- | 3    22 |--  A9
-// A4   -- | 4    21 |--  !WE
-// A3   -- | 5    20 |--  !OE
-// A2   -- | 6    19 |--  A10
-// A1   -- | 7    18 |--  !CE
-// A0   -- | 8    17 |--  IO7
-// IO0  -- | 9    16 |--  IO6
-// IO1  -- | 10   15 |--  IO5
-// IO2  -- | 11   14 |--  IO4
-// GND  -- | 12   13 |--  IO3
+// 1  -- | A7    VCC |-- 24
+// 2  -- | A6     A8 |-- 23
+// 3  -- | A5     A9 |-- 22
+// 4  -- | A4    !WE |-- 21
+// 5  -- | A3    !OE |-- 20
+// 6  -- | A2    A10 |-- 19
+// 7  -- | A1    !CE |-- 18
+// 8  -- | A0    IO7 |-- 17
+// 9  -- | IO0   IO6 |-- 16
+// 10 -- | IO1   IO5 |-- 15
+// 11 -- | IO2   IO4 |-- 14
+// 12 -- | GND   IO3 |-- 13
 
 namespace AT28C16_Wiring {
 static const size_t ADDRESS_BUS_SIZE = 11;  // A0-A10
@@ -243,7 +242,7 @@ public:
 
     // reset
     for (size_t i = 0; i < MAX_ADDRESS_BUS_SIZE; i++) {
-      pins_array[i] = 0;  // xNC
+      pins_array[i] = 0;  // NC
     }
 
     // mapping
@@ -306,7 +305,7 @@ public:
 
     // reset
     for (size_t i = 0; i < MAX_DATA_BUS_SIZE; i++) {
-      pins_array[i] = 0;  // xNC
+      pins_array[i] = 0;  // NC
     }
 
     // mapping
@@ -369,7 +368,7 @@ public:
 
     // reset
     for (size_t i = 0; i < MAX_MANAGEMENT_SIZE; i++) {
-      pins_array[i] = 0;  // xNC
+      pins_array[i] = 0;  // NC
     }
 
     // mapping
