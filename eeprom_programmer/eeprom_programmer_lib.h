@@ -151,6 +151,7 @@ private:
 
   // chip settings
   unsigned int _write_polling_time_usec;
+  bool _can_write_pages;
 
   // optimizations
   bool _current_address[ChipWiringController::MAX_ADDRESS_BUS_SIZE];
@@ -221,6 +222,7 @@ EepromProgrammer::EepromProgrammer(const BoardWiringType board_wiring_type)
 
   // chip settings
   _write_polling_time_usec = 0;
+  _can_write_pages = false;
 
   // mode
   _memory_size_bytes = 0;
@@ -300,7 +302,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
   // !CE
   _chip_enable_pin = management_pins[0];
   pinMode(_chip_enable_pin, OUTPUT);
-  digitalWrite(_chip_enable_pin, HIGH);
+  digitalWrite(_chip_enable_pin, LOW);  // always ON
   // !OE
   _output_enable_pin = management_pins[1];
   pinMode(_output_enable_pin, OUTPUT);
@@ -332,6 +334,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
     case ChipType::AT28C64:
       break;
     case ChipType::AT28C256:
+      _can_write_pages = true;
       break;
     default:
       break;
@@ -356,7 +359,6 @@ ErrorCode EepromProgrammer::set_read_mode(const uint32_t page_size_bytes) {
   _page_size_bytes = page_size_bytes;
 
   // initial READ waveforms state
-  digitalWrite(_chip_enable_pin, HIGH);    // off
   digitalWrite(_output_enable_pin, HIGH);  // off
   digitalWrite(_write_enable_pin, HIGH);   // not in use
   // switch data pins to READ mode
@@ -409,7 +411,6 @@ ErrorCode EepromProgrammer::set_write_mode(const uint32_t page_size_bytes) {
   _page_size_bytes = page_size_bytes;
 
   // initial WRITE waveforms state (!WE controlled)
-  digitalWrite(_chip_enable_pin, HIGH);    // off
   digitalWrite(_output_enable_pin, HIGH);  // not in use
   digitalWrite(_write_enable_pin, HIGH);   // off
 
@@ -444,7 +445,10 @@ ErrorCode EepromProgrammer::write_page(const int page_no, const uint8_t* bytes, 
     if (code != ErrorCode::SUCCESS) {
       return ErrorCode::WRITE_FAILED;
     }
-    _polling(bytes[i]);
+    // poll only last byte for the page write mode
+    if (!_can_write_pages || (_can_write_pages && i == bytes_size - 1)) {
+      _polling(bytes[i]);
+    }
     _write_byte_usec_for_page[i] = (unsigned int)(micros() - write_byte_start_usec);
   }
 
@@ -459,23 +463,17 @@ ErrorCode EepromProgrammer::_read_byte(const uint32_t address, uint8_t& byte) {
   // (1) set address
   _write_address(address);
 
-  // (2) chip enable
-  digitalWrite(_chip_enable_pin, LOW);
-
-  // (3) output enable
+  // (2) output enable
   digitalWrite(_output_enable_pin, LOW);
 
-  // (4) !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
+  // (3) !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
   delayMicroseconds(1);  // arduino cannot delay in ns, only us
 
-  // (5) read data
+  // (4) read data
   byte = _read_data();
 
-  // (6) output disable
+  // (5) output disable
   digitalWrite(_output_enable_pin, HIGH);
-
-  // (7) chip disable
-  digitalWrite(_chip_enable_pin, HIGH);
 
   return ErrorCode::SUCCESS;
 }
@@ -491,17 +489,11 @@ ErrorCode EepromProgrammer::_write_byte(const uint32_t address, const uint8_t da
   // (2) set data
   _write_data(data);
 
-  // (3) chip enable
-  digitalWrite(_chip_enable_pin, LOW);
-
-  // (4) wrtie enable
+  // (3) wrtie enable
   digitalWrite(_write_enable_pin, LOW);
 
-  // (5) wrtie disable (initiates the data flush)
+  // (4) wrtie disable (initiates the data flush)
   digitalWrite(_write_enable_pin, HIGH);
-
-  // (6) chip disable
-  digitalWrite(_chip_enable_pin, HIGH);
 
   return ErrorCode::SUCCESS;
 }
@@ -616,13 +608,11 @@ void EepromProgrammer::_data_polling(const uint8_t data) {
     delayMicroseconds(delay_usec);
 
     // !DATA polling waveforms require to switch !CE and !OE for every attempt
-    digitalWrite(_chip_enable_pin, LOW);
     digitalWrite(_output_enable_pin, LOW);
     // !OE to Output Delay (delta between OE and data ready) == 100 ns MAX
     delayMicroseconds(1);  // arduino cannot delay in ns, only us
     uint8_t read_result = _read_data();
     digitalWrite(_output_enable_pin, HIGH);
-    digitalWrite(_chip_enable_pin, HIGH);
     if (read_result == data) {
       break;
     }
