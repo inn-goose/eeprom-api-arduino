@@ -34,7 +34,7 @@ public:
 
   void send_result_string(int id, const char* string);
   void send_result_bytes(int id, uint8_t* buffer, size_t buffer_size);
-  void send_result_ints(int id, int* buffer, size_t buffer_size);
+  void send_result_longs(int id, long* buffer, size_t buffer_size);
   void send_error(int id, int error_code, const char* error_message, const char* error_data);
 
   // helpers
@@ -134,7 +134,7 @@ void SerialJsonRpcBoard::send_result_bytes(int id, uint8_t* buffer, size_t buffe
   _send_response(response);
 }
 
-void SerialJsonRpcBoard::send_result_ints(int id, int* buffer, size_t buffer_size) {
+void SerialJsonRpcBoard::send_result_longs(int id, long* buffer, size_t buffer_size) {
   // >"result":< == 9
   // max byte = minus + 10 digits + comma separator + space == 13
   // array braces = [] == 2

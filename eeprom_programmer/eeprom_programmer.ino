@@ -13,6 +13,7 @@ using namespace SerialJsonRpcLibrary;
 // * DIP24
 // * DIP28
 static EepromProgrammer eeprom_programmer(BoardWiringType::DIP24);
+// static EepromProgrammer eeprom_programmer(BoardWiringType::DIP28);
 
 
 // Serial JSON RPC Processor
@@ -36,10 +37,10 @@ void rpc_processor(int request_id, const String &method, const String params[], 
       return;
     }
 
-    int chip_settings[] = {
-      (int)eeprom_programmer.get_memory_size_bytes(),
+    long chip_settings[] = {
+      (long)eeprom_programmer.get_memory_size_bytes(),
     };
-    rpc_board.send_result_ints(request_id, chip_settings, sizeof(chip_settings) / sizeof(chip_settings[0]));
+    rpc_board.send_result_longs(request_id, chip_settings, sizeof(chip_settings) / sizeof(chip_settings[0]));
 
   } else if (method == "set_read_mode") {
     if (params_size != 1) {
@@ -134,22 +135,22 @@ void rpc_processor(int request_id, const String &method, const String params[], 
     unsigned int wait_time_for_page[page_size];
     eeprom_programmer.get_read_byte_usec_for_page(wait_time_for_page, page_size);
 
-    int wait_time_for_page_ints[page_size];
+    long wait_time_for_page_longs[page_size];
     for (int i = 0; i < page_size; i++) {
-      wait_time_for_page_ints[i] = (int)wait_time_for_page[i];
+      wait_time_for_page_longs[i] = (long)wait_time_for_page[i];
     }
-    rpc_board.send_result_ints(request_id, wait_time_for_page_ints, page_size);
+    rpc_board.send_result_longs(request_id, wait_time_for_page_longs, page_size);
 
   } else if (method == "get_write_perf") {
     const size_t page_size = eeprom_programmer.get_page_size_bytes();
     unsigned int wait_time_for_page[page_size];
     eeprom_programmer.get_write_byte_usec_for_page(wait_time_for_page, page_size);
 
-    int wait_time_for_page_ints[page_size];
+    long wait_time_for_page_longs[page_size];
     for (int i = 0; i < page_size; i++) {
-      wait_time_for_page_ints[i] = (int)wait_time_for_page[i];
+      wait_time_for_page_longs[i] = (long)wait_time_for_page[i];
     }
-    rpc_board.send_result_ints(request_id, wait_time_for_page_ints, page_size);
+    rpc_board.send_result_longs(request_id, wait_time_for_page_longs, page_size);
 
   } else {
     rpc_board.send_error(request_id, JsonRpcErrorCode::METHOD_NOT_FOUND, "Method not found", method.c_str());
@@ -165,10 +166,10 @@ void setup() {
   // eeprom programmer
   eeprom_programmer.init_programmer();
   // eeprom programmer settings
-  int programmer_settings[] = {
-    (int)eeprom_programmer.get_max_page_size(),
+  long programmer_settings[] = {
+    (long)eeprom_programmer.get_max_page_size(),
   };
-  rpc_board.send_result_ints(0, programmer_settings, sizeof(programmer_settings) / sizeof(programmer_settings[0]));
+  rpc_board.send_result_longs(0, programmer_settings, sizeof(programmer_settings) / sizeof(programmer_settings[0]));
 }
 
 void loop() {
