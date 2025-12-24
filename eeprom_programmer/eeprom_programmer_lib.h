@@ -334,6 +334,8 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
     case ChipType::AT28C64:
       break;
     case ChipType::AT28C256:
+      // doesn't work on Arduino MEGA
+      // enable if use Arduino DUO only
       _can_write_pages = true;
       break;
     default:
