@@ -51,7 +51,7 @@ The programmer’s performance is strongly dependent on the performance of the A
 | AT28C64 | 8K x 8 | 15 | 22 |
 | AT28C256 | 32K x 8 | 56 | 85* |
 
-(*) if [Page-Write](https://goose.sh/blog/eeprom-programmer-7-page-write/) mode is enabled.
+(*) if [page write](https://goose.sh/blog/eeprom-programmer-7-page-write/) mode is enabled.
 
 
 
