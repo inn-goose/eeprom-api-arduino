@@ -56,6 +56,7 @@ ChipType chip_name_to_type(const String& chip_name) {
 // 14 -- | GND   IO3 |-- 15
 
 namespace AT28C64_Wiring {
+static const BoardWiringType BOARD_WIRING_TYPE = BoardWiringType::DIP28;
 static const size_t ADDRESS_BUS_SIZE = 13;  // A0-A12
 static const PIN_NO ADDRESS_BUS_PINS[ADDRESS_BUS_SIZE] = { 10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2 };
 static const size_t DATA_BUS_SIZE = 8;
@@ -83,6 +84,7 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27, 1 };  // !C
 // 14 -- | GND   IO3 |-- 15
 
 namespace AT28C256_Wiring {
+static const BoardWiringType BOARD_WIRING_TYPE = BoardWiringType::DIP28;
 static const size_t ADDRESS_BUS_SIZE = 15;  // A0-A14
 static const PIN_NO ADDRESS_BUS_PINS[ADDRESS_BUS_SIZE] = { 10, 9, 8, 7, 6, 5, 4, 3, 25, 24, 21, 23, 2, 26, 1 };
 static const size_t DATA_BUS_SIZE = 8;
@@ -108,6 +110,7 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 20, 22, 27 };  // !CE, 
 // 12 -- | GND   IO3 |-- 13
 
 namespace AT28C04_Wiring {
+static const BoardWiringType BOARD_WIRING_TYPE = BoardWiringType::DIP24;
 static const size_t ADDRESS_BUS_SIZE = 9;  // A0-A8
 static const PIN_NO ADDRESS_BUS_PINS[ADDRESS_BUS_SIZE] = { 8, 7, 6, 5, 4, 3, 2, 1, 23 };
 static const size_t DATA_BUS_SIZE = 8;
@@ -133,6 +136,7 @@ static const PIN_NO MANAGEMENT_PINS[MANAGEMENT_SIZE] = { 18, 20, 21 };  // !CE, 
 // 12 -- | GND   IO3 |-- 13
 
 namespace AT28C16_Wiring {
+static const BoardWiringType BOARD_WIRING_TYPE = BoardWiringType::DIP24;
 static const size_t ADDRESS_BUS_SIZE = 11;  // A0-A10
 static const PIN_NO ADDRESS_BUS_PINS[ADDRESS_BUS_SIZE] = { 8, 7, 6, 5, 4, 3, 2, 1, 23, 22, 19 };
 static const size_t DATA_BUS_SIZE = 8;
@@ -152,11 +156,35 @@ public:
   ChipWiringController(const BoardWiringType board_wiring_type)
     : _board_wiring_type(board_wiring_type) {}
 
-  void set_chip_type(const ChipType chip_type) {
+  inline BoardWiringType get_board_wiring_type() {
+    return _board_wiring_type;
+  }
+
+  inline void set_chip_type(const ChipType chip_type) {
+    if (_get_chip_board_wiring_type(chip_type) != _board_wiring_type) {
+      _chip_type = ChipType::UNKNOWN;
+      return;
+    }
     _chip_type = chip_type;
   }
-  ChipType get_chip_type() {
+
+  inline ChipType get_chip_type() {
     return _chip_type;
+  }
+
+  inline BoardWiringType _get_chip_board_wiring_type(const ChipType chip_type) {
+    switch (chip_type) {
+      case ChipType::AT28C64:
+        return AT28C64_Wiring::BOARD_WIRING_TYPE;
+      case ChipType::AT28C256:
+        return AT28C256_Wiring::BOARD_WIRING_TYPE;
+      case ChipType::AT28C04:
+        return AT28C04_Wiring::BOARD_WIRING_TYPE;
+      case ChipType::AT28C16:
+        return AT28C16_Wiring::BOARD_WIRING_TYPE;
+      default:
+        return BoardWiringType::UNKNOWN;
+    }
   }
 
   size_t get_board_bus_pins(PIN_NO* pins_array, const size_t array_size) {
@@ -177,10 +205,10 @@ public:
     }
 
     if (board_bus_size == 0 || board_bus_pins == 0) {
-      return -1;
+      return 0;
     }
     if (array_size < board_bus_size) {
-      return -1;
+      return 0;
     }
 
     // memcpu
@@ -231,13 +259,13 @@ public:
     }
 
     if (dip_wiring_mapping == 0) {
-      return -1;
+      return 0;
     }
     if (address_bus_size == 0 || address_bus_pins == 0) {
-      return -1;
+      return 0;
     }
     if (array_size < address_bus_size) {
-      return -1;
+      return 0;
     }
 
     // reset
@@ -294,13 +322,13 @@ public:
     }
 
     if (dip_wiring_mapping == 0) {
-      return -1;
+      return 0;
     }
     if (data_bus_size == 0 || data_bus_pins == 0) {
-      return -1;
+      return 0;
     }
     if (array_size < data_bus_size) {
-      return -1;
+      return 0;
     }
 
     // reset
@@ -357,13 +385,13 @@ public:
     }
 
     if (dip_wiring_mapping == 0) {
-      return -1;
+      return 0;
     }
     if (management_size == 0 || management_pins == 0) {
-      return -1;
+      return 0;
     }
     if (array_size < management_size) {
-      return -1;
+      return 0;
     }
 
     // reset

@@ -21,9 +21,13 @@ class EepromProgrammerClient:
             raise EepromProgrammerClientError("failed to connect programmer, empty settings returned")
 
         self.programmer_settings = {
-            "max_page_size": programmer_settings[0],
+            "board_wiring_type": programmer_settings[0],
+            "max_page_size": programmer_settings[1],
         }
         print(f"programmer_settings: {self.programmer_settings}")
+
+        if self.programmer_settings["board_wiring_type"] == 0:
+            raise EepromProgrammerClientError("invalid board_wiring_type")
 
     def init_chip(self, chip_type: str):
         try:
@@ -66,7 +70,7 @@ class EepromProgrammerClient:
                 read_performance.extend(self._json_rpc_client.send_request("get_read_perf", None))
 
         if collect_performance:
-            print("AVG read time {:.2f} ms".format(sum(read_performance) / len(read_performance)))
+            print("AVG read time {:.2f} us".format(sum(read_performance) / len(read_performance)))
 
         return bytes(output_data)
 
@@ -102,7 +106,7 @@ class EepromProgrammerClient:
                 write_performance.extend(self._json_rpc_client.send_request("get_write_perf", None))
 
         if collect_performance:
-            print("AVG write time {:.2f} ms".format(sum(write_performance) / len(write_performance)))
+            print("AVG write time {:.2f} us".format(sum(write_performance) / len(write_performance)))
 
     def erase_data(self, erase_pattern: int, collect_performance: bool = False):
         if erase_pattern < 0 or erase_pattern > 255:

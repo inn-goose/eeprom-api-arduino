@@ -48,6 +48,16 @@ public:
   ErrorCode init_chip(const String& chip_type);
 
   // settings
+  inline uint32_t get_board_wiring_type() {
+    switch (_chip_wiring_controller.get_board_wiring_type()) {
+      case BoardWiringType::DIP28:
+        return 28;
+      case BoardWiringType::DIP24:
+        return 24;
+      default:
+        return 0;
+    }
+  }
   inline uint32_t get_memory_size_bytes() {
     return _memory_size_bytes;
   }
@@ -240,7 +250,7 @@ EepromProgrammer::EepromProgrammer(const BoardWiringType board_wiring_type)
 ErrorCode EepromProgrammer::init_programmer() {
   PIN_NO board_bus_pins[ChipWiringController::MAX_BOARD_BUS_SIZE];
   const size_t board_bus_size = _chip_wiring_controller.get_board_bus_pins(board_bus_pins, ChipWiringController::MAX_BOARD_BUS_SIZE);
-  if (board_bus_size <= 0) {
+  if (board_bus_size == 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
 
@@ -276,7 +286,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
 
   // address bus
   _address_bus_size = _chip_wiring_controller.get_address_bus_pins(_address_bus_pins, ChipWiringController::MAX_ADDRESS_BUS_SIZE);
-  if (_address_bus_size <= 0) {
+  if (_address_bus_size == 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
   _memory_size_bytes = (uint32_t)(1) << _address_bus_size;
@@ -285,7 +295,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
 
   // data bus
   _data_bus_size = _chip_wiring_controller.get_data_bus_pins(_data_bus_pins, ChipWiringController::MAX_DATA_BUS_SIZE);
-  if (_data_bus_size <= 0) {
+  if (_data_bus_size == 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
 
@@ -295,7 +305,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
   // !CE, !OE, !WE, [!BSY]
   PIN_NO management_pins[ChipWiringController::MAX_MANAGEMENT_SIZE];
   const size_t management_size = _chip_wiring_controller.get_management_pins(management_pins, ChipWiringController::MAX_MANAGEMENT_SIZE);
-  if (management_size <= 0) {
+  if (management_size == 0) {
     return ErrorCode::PINS_NOT_INITIALIZED;
   }
 
@@ -335,7 +345,7 @@ ErrorCode EepromProgrammer::init_chip(const String& chip_name) {
       break;
     case ChipType::AT28C256:
       // doesn't work on Arduino MEGA
-      // enable if use Arduino DUO only
+      // enable if use Arduino DUE only
       _can_write_pages = true;
       break;
     default:

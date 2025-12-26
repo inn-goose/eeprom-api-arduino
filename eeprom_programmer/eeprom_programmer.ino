@@ -167,6 +167,7 @@ void setup() {
   eeprom_programmer.init_programmer();
   // eeprom programmer settings
   long programmer_settings[] = {
+    (long)eeprom_programmer.get_board_wiring_type(),
     (long)eeprom_programmer.get_max_page_size(),
   };
   rpc_board.send_result_longs(0, programmer_settings, sizeof(programmer_settings) / sizeof(programmer_settings[0]));

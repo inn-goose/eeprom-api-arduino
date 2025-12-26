@@ -8,6 +8,8 @@ typedef uint8_t PIN_NO;
 enum BoardWiringType : int {
   DIP28 = 1,
   DIP24 = 2,
+  // unknown
+  UNKNOWN = 10000
 };
 
 
