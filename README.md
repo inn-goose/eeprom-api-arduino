@@ -12,7 +12,7 @@ The EEPROM Programmer project makes it possible to use Arduino platforms with an
 
 The firmware component of the project is flashed onto an Arduino Mega or Due. The EEPROM chip is then connected to the extended pin header on the board, after which the Python CLI can be used to erase, write, or read binary data.
 
-During the development of this project, a series of articles was written. They are available on my blog here: [EEPROM Programmer posts at goose.sh](https://goose.sh/tags/eeprom-programmer/).
+During the development of this project, a series of articles was written. They are available on my blog here: [EEPROM Programmer posts on goose.sh](https://goose.sh/tags/eeprom-programmer/).
 
 
 
@@ -23,13 +23,13 @@ During the development of this project, a series of articles was written. They a
 * `AT28C64 @ DIP28`, [datasheet](https://ww1.microchip.com/downloads/en/devicedoc/doc0001H.pdf)
 * `AT28C256 @ DIP28`, [datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/doc0006.pdf)
 
-Details in my [EEPROM Programmer: Supported Chips](https://goose.sh/blog/eeprom-programmer-8-supported-chips/) post.
+Details in the [EEPROM Programmer: Supported Chips](https://goose.sh/blog/eeprom-programmer-8-supported-chips/) post.
 
 
 
 ## Performance
 
-The programmer’s performance is strongly dependent on the performance of the Arduino platform it is built on; for example, the operating speed differs by 30% between the MEGA and the DUE. Here, measurements are presented for the platforms on which the solution was validated. The performance measurement details and the underlying reasons are described in my [EEPROM Programmer Performance](https://goose.sh/blog/eeprom-programmer-8-supported-chips/#eeprom-programmer-performance) post.
+The programmer’s performance is strongly dependent on the performance of the Arduino platform it is built on; for example, the operating speed differs by 30% between the MEGA and the DUE. Here, measurements are presented for the platforms on which the solution was validated. The performance measurement details and the underlying reasons are described in the [EEPROM Programmer Performance](https://goose.sh/blog/eeprom-programmer-8-supported-chips/#eeprom-programmer-performance) post.
 
 ### Arduino MEGA, 16 MHz
 
@@ -40,7 +40,7 @@ The programmer’s performance is strongly dependent on the performance of the A
 | AT28C64 | 8K x 8 | 21 | 28* |
 | AT28C256 | 32K x 8 | 84 | 305 |
 
-(*) with a [RDY/!BUSY polling](https://goose.sh/blog/eeprom-programmer-6-data-polling-vs-rdy-busy/#rdybusy-pin-polling) mode enabled
+(*) if [RDY/!BUSY polling](https://goose.sh/blog/eeprom-programmer-6-data-polling-vs-rdy-busy/#rdybusy-pin-polling) mode is enabled
 
 ### Arduino DUE, 84 MHz
 
@@ -51,13 +51,13 @@ The programmer’s performance is strongly dependent on the performance of the A
 | AT28C64 | 8K x 8 | 15 | 22 |
 | AT28C256 | 32K x 8 | 56 | 85* |
 
-(*) with a [Page-Write](https://goose.sh/blog/eeprom-programmer-7-page-write/) mode enabled.
+(*) if [Page-Write](https://goose.sh/blog/eeprom-programmer-7-page-write/) mode is enabled.
 
 
 
 ## Data Corruption and Read-Only jumper wire
 
-It is important to note that communication over the Serial protocol can corrupt data stored in the EEPROM memory, despite the **Hardware Protection** claimed in the datasheet. This issue is analyzed in detail in my [Data Corruption on Arduino Serial Connection Reset](https://goose.sh/blog/eeprom-programmer-5-data-corruption/) post.
+It is important to note that communication over the Serial protocol can corrupt data stored in the EEPROM memory, despite the **Hardware Protection** claimed in the datasheet. This issue is analyzed in detail in the [Data Corruption on Arduino Serial Connection Reset](https://goose.sh/blog/eeprom-programmer-5-data-corruption/) post.
 
 To prevent data corruption, the Read-Only jumper wire should always be used, as shown in the wiring diagrams. The jumper should be removed only when rewriting the data in the chip’s memory is explicitly intended.
 
@@ -116,7 +116,7 @@ In the photographs, a short breadboard was used for the `DIP24` wiring, along wi
 
 A separate Python CLI was added to enable reading and writing large volumes of data. When using only the Arduino, it is not possible to program a 64 KB chip, as this does not fit into the MEGA’s memory.
 
-Serial JSON-RPC is used to implement the interface between the CLI and the programmer. On the one hand, this simplifies the interface and accelerates the addition of new functionality; on the other, it introduces certain limitations due to significant protocol overhead. Details of using this protocol are described in my [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
+Serial JSON-RPC is used to implement the interface between the CLI and the programmer. On the one hand, this simplifies the interface and accelerates the addition of new functionality; on the other, it introduces certain limitations due to significant protocol overhead. Details of using this protocol are described in the [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
 
 ### Initialization
 
@@ -125,7 +125,12 @@ To get started, a small amount of Python “magic” is required to initialize t
 ```bash
 pip3 install virtualenv
 
-# specify python version here 👇
+# get the python version
+python --version
+...
+Python 3.9.6
+
+# specify python version here 👇 (use only 3.9)
 PATH=${PATH}:~/Library/Python/3.9/bin/ ./env/init.sh
 
 # activate the newly created venv
