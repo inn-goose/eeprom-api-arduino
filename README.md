@@ -1,206 +1,222 @@
 # EEPROM Programmer
 
-> [!IMPORTANT]
-> This project concerns **external** EEPROM chips, not the built-in Arduino EEPROM memory.
-
-## TLDR
-
-🚧 WIP 🚧
-
-
-## Wiring Diagram
-
-![Wiring Diagram: Arduino Mega and AT28C64](diagram/arduino-mega-at28c64.png)
-
-## EEPROM Programmer on Arduino
-
-set pins layout in `eeprom_wiring.h`
-
-Programmer interface:
-```cpp
-// initialize chip pinout 
-ErrorCode init_chip(const String& chip_type);
-
-// set read mode
-ErrorCode set_read_mode(const int page_size_bytes);
-
-// read one page
-ErrorCode read_page(const int page_no, uint8_t* bytes);
-
-// set write mode
-ErrorCode set_write_mode(const int page_size_bytes);
-
-// write one page
-ErrorCode write_page(const int page_no, const uint8_t* bytes);
-```
-
-### JSON-RPC API
-
-Arduino IDE's *Serial Monitor* on `115200` baud
-
-`init_chip(chip_type: str)`
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "init_chip", "params": ["AT28C64"]}
-```
-
-`set_read_mode(page_size_bytes: int)`
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "set_read_mode", "params": [4]}
-```
-
-`read_page(page_no: int)`
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "read_page", "params": [0]}
-```
-
-`set_write_mode(page_size_bytes: int)`
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "set_write_mode", "params": [4]}
-```
-
-`write_page(page_no: int, data: array[int])`
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "write_page","params": [0, [127, 127, 127, 127]]}
-```
-
-#### Write Operation Sequence
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "init_chip", "params": ["AT28C64"]}
-{"jsonrpc":"2.0", "id":0, "method": "set_write_mode", "params": [4]}
-{"jsonrpc":"2.0", "id":0, "method": "write_page","params": [0, [120, 130, 140, 150]]}
-{"jsonrpc":"2.0", "id":0, "method": "write_page","params": [50, [20, 30, 40, 50]]}
-{"jsonrpc":"2.0", "id":0, "method": "get_write_perf","params": []}
-```
-
-#### Read Operation Sequence
-
-```json
-{"jsonrpc":"2.0", "id":0, "method": "init_chip", "params": ["AT28C64"]}
-{"jsonrpc":"2.0", "id":0, "method": "set_read_mode", "params": [4]}
-{"jsonrpc":"2.0", "id":0, "method": "read_page", "params": [0]}
-{"jsonrpc":"2.0", "id":0, "method": "read_page", "params": [50]}
-```
-
-
-## EEPROM Programmer python CLI
+## About
 
 > [!CAUTION]
 > During read operations with the EEPROM Programmer, the chip's `!WE` pin **MUST** be connected to `VCC` using a jumper wire to disable the write mode. Otherwise, invoking the CLI may corrupt data on the chip due to Arduino's internal behavior. [Details](https://goose.sh/blog/eeprom-programmer-5-data-corruption/)
 
-Uses the [Serial JSON RPC](https://github.com/inn-goose/serial-json-rpc-arduino) interface.
+> [!IMPORTANT]
+> This project concerns **external** EEPROM chips, not the built-in Arduino EEPROM memory.
 
-### init CLI
+The EEPROM Programmer project makes it possible to use Arduino platforms with an extended set of pins to read from and write to EEPROM chips from the AT28Cxx family.
+
+The firmware component of the project is flashed onto an Arduino Mega or Due. The EEPROM chip is then connected to the extended pin header on the board, after which the Python CLI can be used to erase, write, or read binary data.
+
+During the development of this project, a series of articles was written. They are available on my blog here: [EEPROM Programmer posts at goose.sh](https://goose.sh/tags/eeprom-programmer/).
+
+
+
+## Supported Chips
+
+* `AT28C04 @ DIP24`, [datasheet](https://www.tvsat.com.pl/pdf/A/at28c04_atm.pdf)
+* `AT28C16 @ DIP24`, [datasheet](http://cva.stanford.edu/classes/cs99s/datasheets/at28c16.pdf)
+* `AT28C64 @ DIP28`, [datasheet](https://ww1.microchip.com/downloads/en/devicedoc/doc0001H.pdf)
+* `AT28C256 @ DIP28`, [datasheet](https://ww1.microchip.com/downloads/en/DeviceDoc/doc0006.pdf)
+
+Details in my [EEPROM Programmer: Supported Chips](https://goose.sh/blog/eeprom-programmer-8-supported-chips/) post.
+
+
+
+## Performance
+
+The programmer’s performance is strongly dependent on the performance of the Arduino platform it is built on; for example, the operating speed differs by 30% between the MEGA and the DUE. Here, measurements are presented for the platforms on which the solution was validated. The performance measurement details and the underlying reasons are described in my [EEPROM Programmer Performance](https://goose.sh/blog/eeprom-programmer-8-supported-chips/#eeprom-programmer-performance) post.
+
+### Arduino MEGA, 16 MHz
+
+| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec)
+| -- | :--: | :--: | :--: |
+| AT28C04 | 512 x 8 | 1.4 | 1.8 |
+| AT28C16 | 2K x 8 | 5.5 | 14 |
+| AT28C64 | 8K x 8 | 21 | 28* |
+| AT28C256 | 32K x 8 | 84 | 305 |
+
+(*) with a [RDY/!BUSY polling](https://goose.sh/blog/eeprom-programmer-6-data-polling-vs-rdy-busy/#rdybusy-pin-polling) mode enabled
+
+### Arduino DUE, 84 MHz
+
+| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec)
+| -- | :--: | :--: | :--: |
+| AT28C04 | 512 x 8 | 0.9 | 1.4 |
+| AT28C16 | 2K x 8 | 3.6 | 11 |
+| AT28C64 | 8K x 8 | 15 | 22 |
+| AT28C256 | 32K x 8 | 56 | 85* |
+
+(*) with a [Page-Write](https://goose.sh/blog/eeprom-programmer-7-page-write/) mode enabled.
+
+
+
+## Data Corruption and Read-Only jumper wire
+
+It is important to note that communication over the Serial protocol can corrupt data stored in the EEPROM memory, despite the **Hardware Protection** claimed in the datasheet. This issue is analyzed in detail in my [Data Corruption on Arduino Serial Connection Reset](https://goose.sh/blog/eeprom-programmer-5-data-corruption/) post.
+
+To prevent data corruption, the Read-Only jumper wire should always be used, as shown in the wiring diagrams. The jumper should be removed only when rewriting the data in the chip’s memory is explicitly intended.
+
+![Read Only Jumper Wire](wiring/images/dip24-read-only-jumper.png)
+
+
+
+## Wiring
+
+The Programmer supports two chip wiring variants: `DIP24` and `DIP28`. Each type requires its own wiring configuration and a recompilation of the code. Below is a mapping table along with the section of code that must be adjusted accordingly.
+
+| Wiring Type | Supported Chips |
+| -- | -- |
+| DIP24 | AT28C04, AT28C16 |
+| DIP28 | AT28C64, AT28C256 |
+
+file: [./eeprom_programmer/eeprom_programmer.ino](./eeprom_programmer/eeprom_programmer.ino)
+```cpp
+// EEPROM Programmer
+
+// specify the wiring type here
+// * DIP24
+// * DIP28
+static EepromProgrammer eeprom_programmer(BoardWiringType::DIP24);
+// static EepromProgrammer eeprom_programmer(BoardWiringType::DIP28);
+```
+
+The wiring configuration can be reconfigured in the file [./eeprom_programmer/board_wiring.h](./eeprom_programmer/board_wiring.h)
+
+### DIP24 wiring
+
+The pins are arranged sequentially to simplify wiring. On one side, the pins start with GND, and on the other with VCC, eliminating the need for separate power wires.
+
+![EEPROM Programer Wiring DIP24 Diagram](wiring/dip24-wiring-diagram.png)
+
+### DIP28 wiring
+
+For the `DIP28` variant, two additional wires are added on each side.
+
+![EEPROM Programer Wiring DIP24 Diagram](wiring/dip28-wiring-diagram.png)
+
+### Wiring example
+
+In the photographs, a short breadboard was used for the `DIP24` wiring, along with two ribbon cables and a ZIF socket for convenience. This setup is not mandatory: simple jumper wires can be used instead, and the chip may be placed directly into the breadboard.
+
+![DIP24 Wiring with Arduino MEGA](wiring/images/dip24-arduino-mega-1.png)
+![DIP24 Wiring with Arduino MEGA](wiring/images/dip24-arduino-mega-2.png)
+![DIP24 Wiring with Arduino MEGA](wiring/images/dip24-arduino-mega-3.png)
+
+
+
+## Programming EEPROM Chips with CLI
+
+> [!CAUTION]
+> During read operations with the EEPROM Programmer, the chip's `!WE` pin **MUST** be connected to `VCC` using a jumper wire to disable the write mode. Otherwise, invoking the CLI may corrupt data on the chip due to Arduino's internal behavior. [Details](https://goose.sh/blog/eeprom-programmer-5-data-corruption/)
+
+A separate Python CLI was added to enable reading and writing large volumes of data. When using only the Arduino, it is not possible to program a 64 KB chip, as this does not fit into the MEGA’s memory.
+
+Serial JSON-RPC is used to implement the interface between the CLI and the programmer. On the one hand, this simplifies the interface and accelerates the addition of new functionality; on the other, it introduces certain limitations due to significant protocol overhead. Details of using this protocol are described in my [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
+
+### Initialization
+
+To get started, a small amount of Python “magic” is required to initialize the environment in which the CLI will run. Unfortunately, it is not a standalone application.
 
 ```bash
 pip3 install virtualenv
 
+# specify python version here 👇
 PATH=${PATH}:~/Library/Python/3.9/bin/ ./env/init.sh
 
+# activate the newly created venv
 source venv/bin/activate
 
-deactivate
+# add the CLI library to the python path
+export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 ```
 
-### Usage
+### Serial port selection
+
+The CLI must be provided with the port to which the Arduino is connected. The port name can be found in the Arduino IDE or obtained by listing available ports using the following command:
 
 ```bash
-source venv/bin/activate
-
 python3 -m serial.tools.list_ports
 ...
 /dev/cu.usbmodem2101
 ```
 
-#### prepare data
+### Supported commands
 
-```bash
-mkdir ./tmp
-
-# get a "real" EEPROM dump
-curl -LJ --output tmp/zenith_zt1_eeprom.bin "https://github.com/misterblack1/zenith_zt1/raw/refs/heads/main/444-187%20U114%20ROM%202732.bin"
-```
+I designed the CLI interface to closely resemble the `minipro` interface used with *XGecu* programmers.
 
 #### read
 
 ```bash
-source venv/bin/activate
-export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
-
-# read data to file
+# read data from the chip memory and write it to a binary file
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --read tmp/dump_eeprom.bin
 
-# convert to HEX
-xxd tmp/dump_eeprom.bin > tmp/dump_eeprom.hex
+# read the binary file content with xxd
+xxd tmp/dump_eeprom.bin | less
 ```
 
 #### erase
 
 ```bash
-source venv/bin/activate
-export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
-
-# erase with FF pattern
+# erase the chip memory with the specific pattern
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --erase --erase-pattern FF
 ```
 
 #### write
 
 ```bash
-source venv/bin/activate
-export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
-
-# write data from file
+# erase the chip content with the default FF pattern and write the binary over it
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin
 
-# skip erase
+# do not erase the chip content before the write operation
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --skip-erase
 
-# custom erase pattern
+# use custom erase pattern
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --erase-pattern CC
 ```
 
 #### verify
 
 ```bash
-source venv/bin/activate
-export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
-
-# read data and verify it against the file
+# read data and verify it against the binary file
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/64_the_red_migration_AT28C64_ff.bin
 ```
 
 
-## XGecu Programmer as a Reference
 
-Use the [`minipro`](https://formulae.brew.sh/formula/minipro) utility to perform read and write operations with the XGecu programmer
+## Troubleshooting
+
+### Programmer error codes
+
+check [./eeprom_programmer/eeprom_programmer_lib.h](./eeprom_programmer/eeprom_programmer_lib.h) file for error codes
+```cpp
+enum ErrorCode : short {
+  SUCCESS = 0,
+  ...
+```
+
+### Failed to init AT28C256 chip with error: 12
+
+An unknown chip type, or a mismatch between the wiring configuration and the selected chip type. Check the DIP24 or DIP28 wiring.
 
 ```bash
-brew install minipro
+init device: failed, failed to init AT28C256 chip with: error response: {'code': -32010, 'message': 'Programmer error', 'data': 'Failed to init AT28C256 chip with error: 12'}
+```
 
-# write the "real" dump to the chip
-minipro --device AT28C64 -s -u --write test_bin/64_the_red_migration.bin
-minipro --device AT28C256 -s -u --write test_bin/256_the_geometry_of_flight.bin
-
-# read the data
-minipro --device AT28C64 -u --read tmp/dump_xgecu.bin
-minipro --device AT28C256 -u --read tmp/dump_xgecu.bin
-
-# convert to HEX
-xxd tmp/dump_xgecu.bin > tmp/dump_xgecu.hex
-
-# compare
-vimdiff tmp/dump_eeprom.hex tmp/dump_xgecu.hex
+On startup, the CLI reports the board wiring type that the programmer firmware was built with:
+```bash
+programmer_settings: {'board_wiring_type': 24, 'max_page_size': 64}
 ```
 
 
 
-## Tests
+## Testing
+
+### Basic CLI tests
 
 ### prepare
 
@@ -244,15 +260,9 @@ vimdiff tmp/dump_eeprom.hex tmp/64_the_red_migration.hex
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/64_the_red_migration_AT28C64_ff.bin
 ```
 
-
-
-
-## Performance
+### Performance testing with CLI
 
 ```
-source venv/bin/activate
-export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
-
 # AT28C04
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --erase --erase-pattern 11 --collect-performance
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
@@ -278,24 +288,72 @@ export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C256 --verify test_bin/256_the_geometry_of_flight_AT28C256_ff.bin --collect-performance
 ```
 
-| Chip | Size | Byte Read | Total Read | Byte Write | Write |
-| -- | :--: | :--: | :--: | :--: | :--: |
-| AT28C04 | 512 | 450 ms | 1.5 sec | 950 ms | 2 sec |
-| AT28C16 | 2048 | 450 ms | 6 sec | 3800 ms | 14 sec |
-| AT28C64 | 8192 | 400 ms | 20 sec | 4100 ms | 55 sec |
-| AT28C256 | 32768 | 500 ms | 85 sec | 6500 ms | 300 sec |
+### Using XGecu programmer as a reference
 
+Use the [`minipro`](https://formulae.brew.sh/formula/minipro) utility to perform read and write operations with the XGecu programmer
 
-## Datasheets
+```bash
+brew install minipro
 
-AT28C64
-https://ww1.microchip.com/downloads/en/devicedoc/doc0001H.pdf
+# write the "real" dump to the chip
+minipro --device AT28C64 -s -u --write test_bin/64_the_red_migration.bin
+minipro --device AT28C256 -s -u --write test_bin/256_the_geometry_of_flight.bin
 
-AT28C256
-https://ww1.microchip.com/downloads/en/DeviceDoc/doc0006.pdf
+# read the data
+minipro --device AT28C64 -u --read tmp/dump_xgecu.bin
+minipro --device AT28C256 -u --read tmp/dump_xgecu.bin
 
-AT28C04
-https://www.tvsat.com.pl/pdf/A/at28c04_atm.pdf
+# convert to HEX
+xxd tmp/dump_xgecu.bin > tmp/dump_xgecu.hex
 
-AT28C16
-http://cva.stanford.edu/classes/cs99s/datasheets/at28c16.pdf
+# compare
+vimdiff tmp/dump_eeprom.hex tmp/dump_xgecu.hex
+```
+
+### JSON-RPC API
+
+Set Arduino IDE's *Serial Monitor* on `115200` baud
+
+`init_chip(chip_type: str)`
+```json
+{"jsonrpc":"2.0", "id":0, "method": "init_chip", "params": ["AT28C64"]}
+```
+
+`set_read_mode(page_size_bytes: int)`
+```json
+{"jsonrpc":"2.0", "id":0, "method": "set_read_mode", "params": [4]}
+```
+
+`read_page(page_no: int)`
+```json
+{"jsonrpc":"2.0", "id":0, "method": "read_page", "params": [0]}
+```
+
+`set_write_mode(page_size_bytes: int)`
+```json
+{"jsonrpc":"2.0", "id":0, "method": "set_write_mode", "params": [4]}
+```
+
+`write_page(page_no: int, data: array[int])`
+```json
+{"jsonrpc":"2.0", "id":0, "method": "write_page","params": [0, [127, 127, 127, 127]]}
+```
+
+#### write operation sequence
+
+```json
+{"jsonrpc":"2.0", "id":0, "method": "init_chip", "params": ["AT28C64"]}
+{"jsonrpc":"2.0", "id":0, "method": "set_write_mode", "params": [4]}
+{"jsonrpc":"2.0", "id":0, "method": "write_page","params": [0, [120, 130, 140, 150]]}
+{"jsonrpc":"2.0", "id":0, "method": "write_page","params": [50, [20, 30, 40, 50]]}
+{"jsonrpc":"2.0", "id":0, "method": "get_write_perf","params": []}
+```
+
+#### read operation sequence
+
+```json
+{"jsonrpc":"2.0", "id":0, "method": "init_chip", "params": ["AT28C64"]}
+{"jsonrpc":"2.0", "id":0, "method": "set_read_mode", "params": [4]}
+{"jsonrpc":"2.0", "id":0, "method": "read_page", "params": [0]}
+{"jsonrpc":"2.0", "id":0, "method": "read_page", "params": [50]}
+```
