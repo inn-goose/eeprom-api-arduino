@@ -25,6 +25,7 @@ During the development of this project, a series of articles was written. They a
 
 Details in the [EEPROM Programmer: Supported Chips](https://goose.sh/blog/eeprom-programmer-8-supported-chips/) post.
 
+![Supported EEPROM Chips](wiring/images/supported-eeprom-chips.png)
 
 
 ## Performance
@@ -117,6 +118,8 @@ In the photographs, a short breadboard was used for the `DIP24` wiring, along wi
 A separate Python CLI was added to enable reading and writing large volumes of data. When using only the Arduino, it is not possible to program a 64 KB chip, as this does not fit into the MEGA’s memory.
 
 Serial JSON-RPC is used to implement the interface between the CLI and the programmer. On the one hand, this simplifies the interface and accelerates the addition of new functionality; on the other, it introduces certain limitations due to significant protocol overhead. Details of using this protocol are described in the [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
+
+GitHup page for the library: [`Serial JSON RPC for Arduino`](https://github.com/inn-goose/serial-json-rpc-arduino)
 
 ### Initialization
 
