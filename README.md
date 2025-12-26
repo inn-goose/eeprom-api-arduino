@@ -130,7 +130,7 @@ python --version
 ...
 Python 3.9.6
 
-# specify python version here 👇 (use only 3.9)
+# specify python version here 👇 (use only X.Y part)
 PATH=${PATH}:~/Library/Python/3.9/bin/ ./env/init.sh
 
 # activate the newly created venv
