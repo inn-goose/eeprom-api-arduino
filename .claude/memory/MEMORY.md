@@ -1,0 +1,6 @@
+- [User profile](user_profile.md) — embedded dev, blog author, prefers explicit code and real numbers
+- [Platform support](project_platform_support.md) — MEGA/DUE validated, Giga unverified, UNO unsupported
+- [Giga status](project_giga_status.md) — Giga compiles but had serial issues, needs verification
+- [Performance analysis](project_performance_analysis.md) — ArduinoJson is 62% of cost, binary would give 10x speedup
+- [JSON-RPC tradeoffs](project_json_rpc_tradeoffs.md) — why JSON-RPC is still useful, hybrid approach option
+- [Bugs fixed](project_bugs_fixed.md) — 6 bugs fixed (f9615f9), 7 more identified in refactoring section
