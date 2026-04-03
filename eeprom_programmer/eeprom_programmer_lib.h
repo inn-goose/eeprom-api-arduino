@@ -81,7 +81,7 @@ public:
     if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
       return;
     }
-    for (int i; i < buffer_size; i++) {
+    for (int i = 0; i < buffer_size; i++) {
       read_byte_usec_for_page[i] = _read_byte_usec_for_page[i];
     }
   }
@@ -90,7 +90,7 @@ public:
     if (buffer_size <= 0 || buffer_size > _MAX_PAGE_SIZE) {
       return;
     }
-    for (int i; i < buffer_size; i++) {
+    for (int i = 0; i < buffer_size; i++) {
       write_byte_usec_for_page[i] = _write_byte_usec_for_page[i];
     }
   }
@@ -108,13 +108,13 @@ public:
   }
 
   static String address_to_hex_string(const uint32_t address) {
-    char buf[8];
+    char buf[8 + 1];
     sprintf(buf, "%08x", address);
     return String(buf);
   }
 
   static String data_to_hex_string(const uint8_t data) {
-    char buf[2];
+    char buf[2 + 1];
     sprintf(buf, "%02x", data);
     return String(buf);
   }
@@ -165,7 +165,7 @@ private:
 
   // optimizations
   bool _current_address[ChipWiringController::MAX_ADDRESS_BUS_SIZE];
-  bool _current_data[ChipWiringController::MAX_ADDRESS_BUS_SIZE];
+  bool _current_data[ChipWiringController::MAX_DATA_BUS_SIZE];
 
   // modes
   uint32_t _memory_size_bytes;
@@ -468,7 +468,7 @@ ErrorCode EepromProgrammer::write_page(const int page_no, const uint8_t* bytes, 
 }
 
 ErrorCode EepromProgrammer::_read_byte(const uint32_t address, uint8_t& byte) {
-  if (address < 0 || address >= _memory_size_bytes) {
+  if (address >= _memory_size_bytes) {
     return ErrorCode::INVALID_ADDRESS;
   }
 
@@ -491,7 +491,7 @@ ErrorCode EepromProgrammer::_read_byte(const uint32_t address, uint8_t& byte) {
 }
 
 ErrorCode EepromProgrammer::_write_byte(const uint32_t address, const uint8_t data) {
-  if (address < 0 || address >= _memory_size_bytes) {
+  if (address >= _memory_size_bytes) {
     return ErrorCode::INVALID_ADDRESS;
   }
 
