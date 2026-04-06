@@ -187,7 +187,7 @@ private:
 
   static void _address_to_bits_array(uint32_t address, bool* b_address, const size_t address_bus_size) {
     // ensure address is within the memory size range
-    const uint32_t memory_size_bytes = pow(2, address_bus_size);
+    const uint32_t memory_size_bytes = (uint32_t)(1) << address_bus_size;
     if (address >= memory_size_bytes) {
       return;
     }
@@ -590,7 +590,7 @@ void EepromProgrammer::_rdy_busy_polling() {
     const unsigned int delay_usec = 100;
 
     int prevBusyState = currBusyState;
-    while (polling_start_usec + _write_polling_time_usec > micros()) {
+    while ((micros() - polling_start_usec) < _write_polling_time_usec) {
       delayMicroseconds(delay_usec);
 
       prevBusyState = currBusyState;
@@ -616,7 +616,7 @@ void EepromProgrammer::_data_polling(const uint8_t data) {
 
   const unsigned int delay_usec = 50;
 
-  while (polling_start_usec + _write_polling_time_usec > micros()) {
+  while ((micros() - polling_start_usec) < _write_polling_time_usec) {
     delayMicroseconds(delay_usec);
 
     // !DATA polling waveforms require to switch !CE and !OE for every attempt
