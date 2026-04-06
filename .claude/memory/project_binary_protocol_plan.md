@@ -92,9 +92,18 @@ Known acceptable limitations:
 - CRC doesn't cover LEN field — corruption detected indirectly via CRC mismatch
 - Boot frame fire-and-forget — same as JSON-RPC, handled by host init timeout
 
+### Step 2: DONE — `binary_protocol/client.py` created with unit tests, not wired
+
+Bugs found and fixed during review:
+- **SEQ not validated in send_command**: stale responses from previous commands accepted silently. Two consecutive same-type commands could return wrong data. Fixed: compare resp_seq to expected seq, raise on mismatch.
+- **No upper bound on body_len in _read_frame**: corrupted LEN field could cause 64KB read/allocation. Fixed: cap at MAX_BODY_SIZE (130).
+- **Sync detection was fragile nested while loops**: replaced with clean state machine matching firmware pattern. 12 lines vs 25, same behavior.
+- **Timeout semantics mixed**: removed hardcoded RESPONSE_TIMEOUT_SEC override after sync — now uses caller's timeout throughout.
+
+31 unit tests covering: CRC (7), frame building (3), frame parsing (10), send_command (8), CRC cross-validation (3).
+
 ### Remaining Steps
 
-2. Create `eeprom_programmer_cli/binary_protocol/client.py` (additive, not wired)
 3. Switchover: wire binary protocol in `.ino` + `eeprom_programmer_client.py` (atomic)
 4. Delete `serial_json_rpc_lib.h` and `serial_json_rpc/` directory
 5. Update README with new architecture + performance comparison
@@ -107,8 +116,9 @@ CLAUDE.md updated with every commit.
 |---|---|
 | `eeprom_programmer/binary_protocol.h` | CREATE — DONE |
 | `eeprom_programmer/eeprom_programmer.ino` | MODIFY (include added) — DONE |
-| `eeprom_programmer_cli/binary_protocol/__init__.py` | CREATE |
-| `eeprom_programmer_cli/binary_protocol/client.py` | CREATE |
+| `eeprom_programmer_cli/binary_protocol/__init__.py` | CREATE — DONE |
+| `eeprom_programmer_cli/binary_protocol/client.py` | CREATE — DONE |
+| `eeprom_programmer_cli/binary_protocol/test_client.py` | CREATE — DONE |
 | `eeprom_programmer_cli/core/eeprom_programmer_client.py` | MODIFY |
 | `eeprom_programmer/serial_json_rpc_lib.h` | DELETE |
 | `eeprom_programmer_cli/serial_json_rpc/` | DELETE |
