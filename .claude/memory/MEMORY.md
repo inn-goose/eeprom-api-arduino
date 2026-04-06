@@ -9,4 +9,5 @@
 - [Blog: binary migration](project_blog_binary_migration.md) — datapoints and structure for blog post about the migration
 - [Baseline performance](project_baseline_performance.md) — DUE+AT28C64 pre-migration: read 7s, write 13s, full 34s
 - [WE jumper prompting](feedback_we_jumper.md) — don't double-ask about jumper state, trust "go"
+- [Significant changes](feedback_significant_changes.md) — always ask before rewriting existing files
 - [Commit separation](feedback_commit_separation.md) — never mix .claude/ context with source code in same commit
