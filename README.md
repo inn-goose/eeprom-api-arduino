@@ -1,19 +1,16 @@
-# EEPROM Programmer
+# Arduino EEPROM Programmer for AT28C64 / AT28C256
 
-## About
+An Arduino-based parallel EEPROM programmer for the AT28Cxx chip family (AT28C04, AT28C16, AT28C64, AT28C256) with a Python CLI. Validated on Arduino MEGA and DUE. Useful for [Ben Eater's breadboard computer](https://eater.net/) projects and similar builds.
 
 > [!CAUTION]
-> During read operations with the EEPROM Programmer, the chip's `!WE` pin **MUST** be connected to `VCC` using a jumper wire to disable the write mode. Otherwise, invoking the CLI may corrupt data on the chip due to Arduino's internal behavior. [Details](https://goose.sh/blog/eeprom-programmer-5-data-corruption/)
+> During **read** and **standalone verify** operations, the chip's `!WE` pin **MUST** be connected to `VCC` using a jumper wire to prevent data corruption from Arduino's reset behavior. The `--write` command includes in-session verify and does not require the jumper. [Details](https://goose.sh/blog/eeprom-programmer-5-data-corruption/)
 
 > [!IMPORTANT]
 > This project concerns **external** EEPROM chips, not the built-in Arduino EEPROM memory.
 
-The EEPROM Programmer project makes it possible to use Arduino platforms with an extended set of pins to read from and write to EEPROM chips from the AT28Cxx family.
+The firmware is flashed onto an Arduino MEGA or DUE. The EEPROM chip is connected to the extended pin header (pins 22-53), and the Python CLI communicates over Serial JSON-RPC to erase, write, read, and verify binary data. The CLI interface is modeled after [`minipro`](https://formulae.brew.sh/formula/minipro) (XGecu programmer).
 
-The firmware component of the project is flashed onto an Arduino Mega or Due. The EEPROM chip is then connected to the extended pin header on the board, after which the Python CLI can be used to erase, write, or read binary data.
-
-During the development of this project, a series of articles was written. They are available on my blog here: [EEPROM Programmer posts on goose.sh](https://goose.sh/tags/eeprom-programmer/).
-
+A companion blog series documents the development: [EEPROM Programmer posts on goose.sh](https://goose.sh/tags/eeprom-programmer/).
 
 
 ## Supported Chips
@@ -30,11 +27,11 @@ Details in the [EEPROM Programmer: Supported Chips](https://goose.sh/blog/eeprom
 
 ## Performance
 
-The programmer’s performance is strongly dependent on the performance of the Arduino platform it is built on; for example, the operating speed differs by 30% between the MEGA and the DUE. Here, measurements are presented for the platforms on which the solution was validated. The performance measurement details and the underlying reasons are described in the [EEPROM Programmer Performance](https://goose.sh/blog/eeprom-programmer-8-supported-chips/#eeprom-programmer-performance) post.
+The programmer's performance is strongly dependent on the Arduino platform; the DUE is ~30% faster than the MEGA for reads, and significantly faster for writes due to page write support. The performance measurement details are described in the [EEPROM Programmer Performance](https://goose.sh/blog/eeprom-programmer-8-supported-chips/#eeprom-programmer-performance) post.
 
 ### Arduino MEGA, 16 MHz
 
-| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec)
+| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec) |
 | -- | :--: | :--: | :--: |
 | AT28C04 | 512 x 8 | 1.4 | 1.8 |
 | AT28C16 | 2K x 8 | 5.5 | 14 |
@@ -45,7 +42,7 @@ The programmer’s performance is strongly dependent on the performance of the A
 
 ### Arduino DUE, 84 MHz
 
-| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec)
+| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec) |
 | -- | :--: | :--: | :--: |
 | AT28C04 | 512 x 8 | 0.9 | 1.4 |
 | AT28C16 | 2K x 8 | 3.6 | 11 |
@@ -56,11 +53,13 @@ The programmer’s performance is strongly dependent on the performance of the A
 
 
 
-## Data Corruption and Read-Only jumper wire
+## Data Corruption and Read-Only Jumper Wire
 
-It is important to note that communication over the Serial protocol can corrupt data stored in the EEPROM memory, despite the **Hardware Protection** claimed in the datasheet. This issue is analyzed in detail in the [Data Corruption on Arduino Serial Connection Reset](https://goose.sh/blog/eeprom-programmer-5-data-corruption/) post.
+Communication over the Serial protocol can corrupt data stored in the EEPROM memory, despite the **Hardware Protection** claimed in the datasheet. This issue is analyzed in detail in the [Data Corruption on Arduino Serial Connection Reset](https://goose.sh/blog/eeprom-programmer-5-data-corruption/) post.
 
-To prevent data corruption, the Read-Only jumper wire should always be used, as shown in the wiring diagrams. The jumper should be removed only when rewriting the data in the chip’s memory is explicitly intended.
+To prevent data corruption, the Read-Only jumper wire should always be used during read operations, as shown in the wiring diagrams. The jumper should be removed only when writing data to the chip.
+
+The `--write` command performs erase, write, and verify in a single serial session without reconnecting, so the jumper is not needed for write+verify operations.
 
 ![Read Only Jumper Wire](wiring/images/dip24-read-only-jumper.png)
 
@@ -92,13 +91,13 @@ The wiring configuration can be reconfigured in the file [./eeprom_programmer/bo
 
 The pins are arranged sequentially to simplify wiring. On one side, the pins start with GND, and on the other with VCC, eliminating the need for separate power wires.
 
-![EEPROM Programer Wiring DIP24 Diagram](wiring/dip24-wiring-diagram.png)
+![EEPROM Programmer Wiring DIP24 Diagram](wiring/dip24-wiring-diagram.png)
 
 ### DIP28 wiring
 
 For the `DIP28` variant, two additional wires are added on each side.
 
-![EEPROM Programer Wiring DIP24 Diagram](wiring/dip28-wiring-diagram.png)
+![EEPROM Programmer Wiring DIP28 Diagram](wiring/dip28-wiring-diagram.png)
 
 ### Wiring example
 
@@ -112,18 +111,13 @@ In the photographs, a short breadboard was used for the `DIP24` wiring, along wi
 
 ## Programming EEPROM Chips with CLI
 
-> [!CAUTION]
-> During read operations with the EEPROM Programmer, the chip's `!WE` pin **MUST** be connected to `VCC` using a jumper wire to disable the write mode. Otherwise, invoking the CLI may corrupt data on the chip due to Arduino's internal behavior. [Details](https://goose.sh/blog/eeprom-programmer-5-data-corruption/)
-
-A separate Python CLI was added to enable reading and writing large volumes of data. When using only the Arduino, it is not possible to program a 64 KB chip, as this does not fit into the MEGA’s memory.
+A Python CLI enables reading and writing large volumes of data. When using only the Arduino, it is not possible to program a 64 KB chip, as this does not fit into the MEGA's memory.
 
 Serial JSON-RPC is used to implement the interface between the CLI and the programmer. On the one hand, this simplifies the interface and accelerates the addition of new functionality; on the other, it introduces certain limitations due to significant protocol overhead. Details of using this protocol are described in the [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
 
-GitHup page for the library: [`Serial JSON RPC for Arduino`](https://github.com/inn-goose/serial-json-rpc-arduino)
+GitHub page for the library: [`Serial JSON RPC for Arduino`](https://github.com/inn-goose/serial-json-rpc-arduino)
 
 ### Initialization
-
-To get started, a small amount of Python “magic” is required to initialize the environment in which the CLI will run. Unfortunately, it is not a standalone application.
 
 ```bash
 pip3 install virtualenv
@@ -133,7 +127,7 @@ python --version
 ...
 Python 3.9.6
 
-# specify python version here 👇 (use only X.Y part)
+# specify python version here (use only X.Y part)
 PATH=${PATH}:~/Library/Python/3.9/bin/ ./env/init.sh
 
 # activate the newly created venv
@@ -155,7 +149,7 @@ python3 -m serial.tools.list_ports
 
 ### Supported commands
 
-I designed the CLI interface to closely resemble the `minipro` interface used with *XGecu* programmers.
+The CLI interface closely resembles the `minipro` interface used with *XGecu* programmers.
 
 #### read
 
@@ -176,9 +170,14 @@ xxd tmp/dump_eeprom.bin | less
 
 #### write
 
+The `--write` command performs erase + write + verify in a single serial session. Verify runs automatically after writing, without reconnecting to the board.
+
 ```bash
-# erase the chip content with the default FF pattern and write the binary over it
+# erase + write + verify (default)
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin
+
+# skip verify after write
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --skip-verify
 
 # do not erase the chip content before the write operation
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --skip-erase
@@ -188,6 +187,8 @@ xxd tmp/dump_eeprom.bin | less
 ```
 
 #### verify
+
+Standalone verify reads the chip and compares against a binary file. Requires the `!WE` jumper wire to prevent data corruption on reconnect.
 
 ```bash
 # read data and verify it against the binary file
@@ -200,7 +201,7 @@ xxd tmp/dump_eeprom.bin | less
 
 ### Programmer error codes
 
-check [./eeprom_programmer/eeprom_programmer_lib.h](./eeprom_programmer/eeprom_programmer_lib.h) file for error codes
+Check [./eeprom_programmer/eeprom_programmer_lib.h](./eeprom_programmer/eeprom_programmer_lib.h) for error codes:
 ```cpp
 enum ErrorCode : short {
   SUCCESS = 0,
@@ -226,14 +227,22 @@ programmer_settings: {'board_wiring_type': 24, 'max_page_size': 64}
 
 ### Basic CLI tests
 
-### prepare
+#### prepare
 
 ```bash
 source venv/bin/activate
 export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 ```
 
-### erase
+#### write + verify (in-session)
+
+No jumper swapping needed. The `--write` command performs erase, write, and verify in a single serial session.
+
+```bash
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration_AT28C64_ff.bin --collect-performance
+```
+
+#### erase
 
 ```bash
 # >> remove jumper wire
@@ -245,7 +254,7 @@ export PYTHONPATH=./eeprom_programmer_cli/:$PYTHONPATH
 xxd tmp/dump_eeprom.bin | less
 ```
 
-### write and read
+#### write and read
 
 ```bash
 # >> remove jumper wire
@@ -258,11 +267,11 @@ xxd tmp/dump_eeprom.bin > tmp/dump_eeprom.hex
 vimdiff tmp/dump_eeprom.hex tmp/64_the_red_migration.hex
 ```
 
-### verify
+#### standalone verify
 
 ```bash
 # >> remove jumper wire
-./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --collect-performance
+./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin --skip-verify --collect-performance
 
 # >> set jumper wire
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --verify test_bin/64_the_red_migration_AT28C64_ff.bin
@@ -270,7 +279,7 @@ vimdiff tmp/dump_eeprom.hex tmp/64_the_red_migration.hex
 
 ### Performance testing with CLI
 
-```
+```bash
 # AT28C04
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --erase --erase-pattern 11 --collect-performance
 ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C04 --read tmp/dump_eeprom.bin --collect-performance && xxd tmp/dump_eeprom.bin | less
