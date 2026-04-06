@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 An Arduino-based EEPROM programmer for AT28Cxx family chips (AT28C04, AT28C16, AT28C64, AT28C256). Two components:
 
 1. **Arduino firmware** (`eeprom_programmer/`) — C++ sketch, validated on Arduino Mega and Due. Arduino Giga compiles but had serial issues (needs verification).
-2. **Python CLI** (`eeprom_programmer_cli/`) — host-side tool communicating over Serial JSON-RPC
+2. **Python CLI** (`eeprom_programmer_cli/`) — host-side tool communicating over binary serial protocol
 
 The CLI interface is modeled after `minipro` (XGecu programmer). A companion blog series documents the development: [goose.sh/tags/eeprom-programmer](https://goose.sh/tags/eeprom-programmer/).
 
@@ -22,7 +22,6 @@ All logic lives in header files — no `.cpp` files. The `.ino` includes everyth
 - `chip_wiring.h` — per-chip pin mappings using **DIP pin numbers** (1-24 or 1-28) and `ChipWiringController`
 - `board_wiring.h` — maps **DIP pin positions to Arduino GPIO numbers** for DIP24 and DIP28 socket layouts
 - `binary_protocol.h` — binary serial protocol handler. Frame format: `[0xAA][0x55][LEN_L][LEN_H][BODY...][CRC_L][CRC_H]`, CRC-16/CCITT, state machine receiver. No external dependencies. 68-byte receive buffer, 136-byte send buffer.
-- `serial_json_rpc_lib.h` — **DEAD CODE, pending deletion.** Former JSON-RPC 2.0 protocol handler. Replaced by `binary_protocol.h`.
 
 **Two-level pin mapping** (non-obvious): chip wiring tables define which DIP pin number corresponds to each logical function (A0, A1, IO0, !CE, etc.). The board wiring table then resolves DIP pin positions to physical Arduino GPIO numbers. Adding a new chip means defining its DIP-pin-to-function mapping in `chip_wiring.h`; changing the Arduino board means updating the DIP-to-GPIO table in `board_wiring.h`.
 
@@ -34,7 +33,6 @@ All logic lives in header files — no `.cpp` files. The `.ino` includes everyth
 - `core/eeprom_programmer_client.py` — `EepromProgrammerClient`: wraps binary protocol calls, handles 64-byte page read/write
 - `binary_protocol/client.py` — `BinaryProtocolClient`: pyserial connection, binary frame building/parsing, CRC-16/CCITT
 - `binary_protocol/test_client.py` — 32 unit tests for CRC, frame building, frame parsing, send_command, cross-validation
-- `serial_json_rpc/client.py` — **DEAD CODE, pending deletion.** Former JSON-RPC client. Replaced by `binary_protocol/client.py`.
 
 **Data flow**: CLI sends binary frames over serial -> firmware state machine parses and dispatches -> firmware manipulates EEPROM via GPIO -> binary response frame back. The architecture follows a "smart client, simple board" pattern — the CLI holds business logic while the firmware exposes only basic page read/write primitives.
 
@@ -59,7 +57,7 @@ The firmware uses **no conditional compilation** (`#ifdef`). A single codebase c
 ## Build and Setup
 
 ### Arduino firmware
-Compile and upload via Arduino IDE. Requires [ArduinoJson](https://arduinojson.org/) library. Serial baud rate: 115200.
+Compile and upload via Arduino IDE. No external library dependencies. Serial baud rate: 115200.
 
 Before compiling, set the wiring type in `eeprom_programmer.ino`:
 ```cpp
@@ -102,7 +100,7 @@ Add `--collect-performance` to any operation for timing data.
   **Workaround for automated verify**: use in-session write+verify (CLI `--write` with verify, no serial reconnect between operations) to avoid the reset-induced corruption.
 - **Write polling strategies**: AT28C64 has a dedicated RDY/!BUSY pin (faster, simpler polling). Other chips use data polling (read-back loop until written value matches). Both achieve ~400-450 us write time. Controlled by `_polling()` method which auto-selects based on pin availability.
 - **Page size**: both read and write use 64-byte pages (`_MAX_PAGE_SIZE = 64`). This is also the AT28C256's hardware page buffer size.
-- **JSON-RPC buffer**: 350 bytes max per message. The comment "works fine for UNO R3" in `serial_json_rpc_lib.h` refers to the JSON-RPC library's memory footprint in isolation, not EEPROM programmer compatibility. Messages delimited by `\n`.
+- **Binary protocol buffers**: receive body buffer 68 bytes (cmd + seq + page_no + 64 data). Send frame buffer 136 bytes (sync + len + cmd + seq + max 128 payload + crc). Max payload is perf timings: 64 × uint16 = 128 bytes.
 - **Test binaries** (`test_bin/`): two variants per chip — raw data (`64_the_red_migration.bin`) and padded to full chip size with 0xFF (`64_the_red_migration_AT28C64_ff.bin`). The number prefix corresponds to the chip model (4=AT28C04, 16=AT28C16, 64=AT28C64, 256=AT28C256). The `--verify` command requires the padded `_ff` variant.
 
 ## Potential Refactoring

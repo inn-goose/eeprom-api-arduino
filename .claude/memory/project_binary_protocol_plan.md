@@ -129,24 +129,13 @@ Performance results (DUE + AT28C64 8KB):
 
 32 unit tests passing.
 
-### Remaining Steps
+### Steps 4+5: DONE — deleted dead code, updated README and CLAUDE.md
 
-4. Delete `serial_json_rpc_lib.h` and `serial_json_rpc/` directory
-5. Update README with new architecture + performance comparison
+Deleted: `serial_json_rpc_lib.h`, `serial_json_rpc/__init__.py`, `serial_json_rpc/client.py`.
+Updated: README (binary protocol description, new perf table, legacy JSON-RPC API section marked), CLAUDE.md (removed dead code refs, updated architecture).
 
-CLAUDE.md updated with every commit.
+## Migration: COMPLETE
 
-## Files
+All 5 steps done. Binary protocol is the sole serial protocol. No ArduinoJson dependency.
 
-| File | Action |
-|---|---|
-| `eeprom_programmer/binary_protocol.h` | CREATE — DONE |
-| `eeprom_programmer/eeprom_programmer.ino` | MODIFY — DONE (steps 1+3) |
-| `eeprom_programmer_cli/binary_protocol/__init__.py` | CREATE — DONE |
-| `eeprom_programmer_cli/binary_protocol/client.py` | CREATE — DONE |
-| `eeprom_programmer_cli/binary_protocol/test_client.py` | CREATE — DONE |
-| `eeprom_programmer_cli/core/eeprom_programmer_client.py` | MODIFY — DONE |
-| `eeprom_programmer/serial_json_rpc_lib.h` | DELETE |
-| `eeprom_programmer_cli/serial_json_rpc/` | DELETE |
-
-**How to apply:** This memory tracks migration progress. Check step status before continuing work.
+**How to apply:** Migration is finished. This memory is historical context for future work.
