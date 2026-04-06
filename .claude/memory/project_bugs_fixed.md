@@ -16,10 +16,26 @@ type: project
 - `pow(2, n)` in hot loop (`_address_to_bits_array`) — should be bit shift
 - `micros()` overflow in polling loops — unsafe addition pattern
 - `_data_polling` toggles entire data bus twice per byte
-- ArduinoJson v7 removed `DynamicJsonDocument`
 - No `while (!Serial)` for native USB boards
 - 350-byte buffer margin tight for write_page
 - `json_array_to_byte_array` undersizes its JsonDocument
 
+## ArduinoJson version (discovered 2026-04-06)
+- Code uses `DynamicJsonDocument` (ArduinoJson v6 API)
+- **v6.21.5 does NOT work** — `DynamicJsonDocument(serial_read_buffer_pos)` undersizes allocation, causes `NoMemory` on every request
+- **v7.4.2 WORKS** — provides compatibility shim for `DynamicJsonDocument`, handles allocation correctly
+- User's Arduino IDE uses v7.4.2; this is the version that was always used in practice
+
+## Baseline performance (DUE + AT28C64 + ArduinoJson v7.4.2)
+- Read 8KB: 13.90s
+- Write 8KB: 20.72s (byte-by-byte with RDY/!BUSY polling)
+- Erase 8KB: 20.74s
+- Verify: 13.90s (same as read)
+
+## 10K resistor on !WE (tested 2026-04-06)
+- Reddit user nib85 suggested replacing !WE jumper with 10K pull-up resistor
+- **Does NOT fully work** — address 0x0000 still gets corrupted to 0xFF on Arduino serial reset
+- Jumper wire approach (swap between write/read) remains the working solution
+
 **Why:** Track what was fixed and what remains for future sessions.
-**How to apply:** If user asks about remaining bugs or wants to continue fixing, reference the "not yet fixed" list.
+**How to apply:** If user asks about remaining bugs or wants to continue fixing, reference the "not yet fixed" list. Use ArduinoJson v7.4.2 for compilation until binary protocol migration removes the dependency entirely.

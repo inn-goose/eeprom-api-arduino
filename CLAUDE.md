@@ -89,7 +89,13 @@ Add `--collect-performance` to any operation for timing data.
 
 ## Key Design Details
 
-- **!WE pin safety**: during read operations, the EEPROM's `!WE` pin MUST be physically connected to VCC via jumper wire. Arduino's serial reset causes voltage transients (~2V, lasting ~3 sec) that can trigger unintended writes. Remove the jumper only for write/erase operations.
+- **!WE pin safety and data corruption**: during read operations, the EEPROM's `!WE` pin MUST be physically connected to VCC via jumper wire. Arduino's serial reset causes voltage transients that trigger unintended writes. Remove the jumper only for write/erase operations. Details in [blog post](https://goose.sh/blog/eeprom-programmer-5-data-corruption/).
+
+  **Root cause (DUE)**: The SAM3X8E has ESD protection diodes on every GPIO pin (clamped to VDDIO). During reset, the 3.3V VDDIO rail ramps from 0V, and the ESD diode clamps GPIO pins to VDDIO+0.3V ≈ 0.3V — well below the AT28C64's V_IL threshold (0.8V). The EEPROM interprets this as a valid LOW on !WE. Combined with the AT28C64's 100ns minimum write pulse width (tWP, datasheet page 14), a write to address 0x0000 occurs during the reset window. The 5V USB rail powers up before the 3.3V regulator stabilizes, creating a window where the EEPROM is operational but all control pins are clamped LOW by ESD diodes. No passive pull-up resistor (tested 10K and 1K on !WE, 10K on !CE/!OE) can overcome this because it's a diode clamp, not a resistive divider.
+
+  **DUE Programming Port specifics**: The ATmega16U2 drives NRST LOW for ~200ms directly through a 10K series resistor (no RC pulse capacitor like UNO/MEGA). The cap-on-RESET trick does not work on DUE. Total boot time with undefined pin states: ~3-4 seconds.
+
+  **Workaround for automated verify**: use in-session write+verify (CLI `--write` with verify, no serial reconnect between operations) to avoid the reset-induced corruption.
 - **Write polling strategies**: AT28C64 has a dedicated RDY/!BUSY pin (faster, simpler polling). Other chips use data polling (read-back loop until written value matches). Both achieve ~400-450 us write time. Controlled by `_polling()` method which auto-selects based on pin availability.
 - **Page size**: both read and write use 64-byte pages (`_MAX_PAGE_SIZE = 64`). This is also the AT28C256's hardware page buffer size.
 - **JSON-RPC buffer**: 350 bytes max per message. The comment "works fine for UNO R3" in `serial_json_rpc_lib.h` refers to the JSON-RPC library's memory footprint in isolation, not EEPROM programmer compatibility. Messages delimited by `\n`.
