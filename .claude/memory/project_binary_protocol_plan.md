@@ -1,12 +1,12 @@
 ---
-name: Binary serial protocol migration plan (EBSP v1)
-description: Full protocol spec and implementation plan for replacing JSON-RPC + ArduinoJson with a lightweight binary protocol
+name: Binary serial protocol migration plan
+description: Protocol spec, 6-commit incremental plan, and blog post datapoints for replacing JSON-RPC + ArduinoJson
 type: project
 ---
 
 ## Goal
 
-Replace JSON-RPC + ArduinoJson with a binary serial protocol (EBSP v1). Eliminates the only external firmware dependency, reduces RAM usage by 63%, and yields projected ~10x speedup for bulk operations.
+Replace JSON-RPC + ArduinoJson with a binary serial protocol. Eliminates the only external firmware dependency, reduces RAM usage by 63%, and yields projected ~10x speedup for bulk operations.
 
 **Why:** ArduinoJson is 62% of per-page read time on MEGA (~102ms of 164ms). It consumes ~6KB flash + ~1KB RAM. Has v6→v7 breaking change. Binary protocol eliminates all of this.
 
@@ -18,7 +18,7 @@ Replace JSON-RPC + ArduinoJson with a binary serial protocol (EBSP v1). Eliminat
 | Write 8KB | 20.72s |
 | Erase 8KB | 20.74s |
 
-## Protocol Design: EBSP v1
+## Protocol Design
 
 ### Frame Format
 
@@ -71,23 +71,24 @@ States: SYNC1 → SYNC2 → LEN_L → LEN_H → BODY (N bytes) → CRC_L → CRC
 
 Blocking `serial.read(n)` with timeout — eliminates the 50ms poll sleep.
 
-## Implementation Steps
+## Implementation Steps (incremental, 6 commits)
 
-1. Create `eeprom_programmer/serial_protocol.h` (replaces serial_json_rpc_lib.h)
-2. Update `eeprom_programmer/eeprom_programmer.ino` to wire new protocol
-3. Create `eeprom_programmer_cli/serial_protocol/client.py` (replaces serial_json_rpc/client.py)
-4. Update `eeprom_programmer_cli/core/eeprom_programmer_client.py`
-5. Delete `serial_json_rpc_lib.h` and `serial_json_rpc/` directory, remove ArduinoJson dependency
-6. Fix hot-path issues: pow() → bitshift, micros() overflow
+1. Create `eeprom_programmer/binary_protocol.h` (additive, not wired)
+2. Create `eeprom_programmer_cli/binary_protocol/client.py` (additive, not wired)
+3. Switchover: wire binary protocol in `.ino` + `eeprom_programmer_client.py` (atomic)
+4. Delete `serial_json_rpc_lib.h` and `serial_json_rpc/` directory
+5. Update README with new architecture + performance comparison
+
+CLAUDE.md updated with every commit.
 
 ## Files
 
 | File | Action |
 |---|---|
-| `eeprom_programmer/serial_protocol.h` | CREATE |
+| `eeprom_programmer/binary_protocol.h` | CREATE |
 | `eeprom_programmer/eeprom_programmer.ino` | MODIFY |
-| `eeprom_programmer_cli/serial_protocol/__init__.py` | CREATE |
-| `eeprom_programmer_cli/serial_protocol/client.py` | CREATE |
+| `eeprom_programmer_cli/binary_protocol/__init__.py` | CREATE |
+| `eeprom_programmer_cli/binary_protocol/client.py` | CREATE |
 | `eeprom_programmer_cli/core/eeprom_programmer_client.py` | MODIFY |
 | `eeprom_programmer/serial_json_rpc_lib.h` | DELETE |
 | `eeprom_programmer_cli/serial_json_rpc/` | DELETE |

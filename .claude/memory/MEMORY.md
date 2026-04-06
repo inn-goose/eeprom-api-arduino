@@ -5,5 +5,6 @@
 - [JSON-RPC tradeoffs](project_json_rpc_tradeoffs.md) — why JSON-RPC is still useful, hybrid approach option
 - [Bugs fixed](project_bugs_fixed.md) — 6 bugs fixed (f9615f9), 7 more identified in refactoring section
 - [WE pin protection](project_we_pin_protection.md) — deep research: ESD diodes are root cause, no pull-up works on DUE
-- [Binary protocol plan](project_binary_protocol_plan.md) — EBSP v1 spec and implementation plan to replace JSON-RPC
+- [Binary protocol plan](project_binary_protocol_plan.md) — protocol spec and 6-commit incremental migration plan
+- [Blog: binary migration](project_blog_binary_migration.md) — datapoints and structure for blog post about the migration
 - [Commit separation](feedback_commit_separation.md) — never mix .claude/ context with source code in same commit

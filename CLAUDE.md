@@ -106,9 +106,7 @@ Add `--collect-performance` to any operation for timing data.
 
 ### Firmware performance
 
-- **`pow()` in hot path**: `_address_to_bits_array()` calls `pow(2, address_bus_size)` (floating-point) on every byte read/write. MEGA has no FPU — this is software float emulation. Should be `(uint32_t)(1) << address_bus_size` (already used elsewhere in the code, line 292).
 - **`_data_polling` toggles entire data bus twice per byte**: switches all 8 data pins to READ mode and back to WRITE mode for each poll cycle. Each switch does 8x `pinMode` + `digitalWrite` calls. Affects AT28C04, AT28C16, AT28C256-on-MEGA (chips without RDY/!BUSY pin).
-- **`micros()` overflow in polling loops**: `polling_start_usec + _write_polling_time_usec > micros()` fails if `micros()` wraps (~70 min). Safe pattern: `(micros() - polling_start_usec) < _write_polling_time_usec`.
 
 ### Serial protocol: JSON-RPC performance analysis
 
