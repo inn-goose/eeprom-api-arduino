@@ -76,6 +76,27 @@ Per-byte timings (`--collect-performance`):
 
 > Note: measurements use in-session write+verify (no serial reconnect between operations) to avoid [data corruption from Arduino's reset behavior](/blog/eeprom-programmer-5-data-corruption/).
 
+```
+$ ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin
+connect programmer: /dev/cu.usbmodem2101
+programmer_settings: {'board_wiring_type': 28, 'max_page_size': 64}
+connect programmer: DONE, 0.24 sec
+init device: AT28C64
+chip settings: {'memory_size': 8192}
+init device: DONE
+write operation: test_bin/64_the_red_migration.bin
+erase operation
+erase pattern: 0xFF
+set_write_mode: WRITE mode is ON for 64 bytes pages
+erase operation: DONE, 13.86 sec
+write operation: started
+set_write_mode: WRITE mode is ON for 64 bytes pages
+write operation: DONE, 12.91 sec
+verify operation: started
+set_read_mode: READ mode is ON for 64 bytes pages
+verify operation: DONE, 6.97 sec
+```
+
 
 ## The Decision
 
@@ -135,6 +156,133 @@ ArduinoJson is too heavy for a microcontroller that just needs to shuttle 64-byt
 | 0x87 | GET_WRITE_PERF | resp | timings: uint16[N] |
 | 0xFE | BOOT | special | version: uint8, wiring_type: uint8, max_page_size: uint8 |
 | 0xFF | ERROR | special | original_cmd: uint8, error_code: uint16, message: null-terminated |
+
+### Firmware: State Machine Receiver
+
+The firmware reads serial data byte-by-byte and advances through a state machine. No heap allocation, no parsing — just state transitions and buffer fills:
+
+```cpp
+void loop() {
+  while (Serial.available()) {
+    uint8_t c = (uint8_t)Serial.read();
+
+    switch (_state) {
+      case WAIT_SYNC1:
+        if (c == SYNC_BYTE_1) _state = WAIT_SYNC2;
+        break;
+
+      case WAIT_SYNC2:
+        if (c == SYNC_BYTE_2) {
+          _state = WAIT_LEN_L;
+        } else if (c == SYNC_BYTE_1) {
+          _state = WAIT_SYNC2;  // 0xAA again — could be start of new sync
+        } else {
+          _state = WAIT_SYNC1;
+        }
+        break;
+
+      // ... LEN_L → LEN_H → BODY → CRC_L → CRC_H → dispatch
+    }
+  }
+}
+```
+
+After CRC validation, the handler is called with `(cmd, seq, payload, payload_len)` — raw bytes, no deserialization.
+
+### Firmware: Command Handler
+
+Compare the binary handler to the [JSON-RPC version](/blog/eeprom-programmer-4-serial-json-rpc-api/). No string parsing, no JSON document allocation, no type conversion:
+
+```cpp
+void command_handler(uint8_t cmd, uint8_t seq,
+                     const uint8_t* payload, uint16_t payload_len) {
+  if (cmd == CMD_READ_PAGE) {
+    uint16_t page_no = payload[0] | ((uint16_t)payload[1] << 8);
+
+    uint8_t buffer[page_size];
+    ErrorCode code = eeprom_programmer.read_page(page_no, buffer);
+
+    binary_board.send_response(cmd, seq, buffer, page_size);
+  }
+  // ...
+}
+```
+
+The entire frame — sync, length, body, CRC — is built in a single contiguous buffer and sent with one `Serial.write()` call:
+
+```cpp
+void _send_frame(uint8_t cmd, uint8_t seq,
+                 const uint8_t* payload, uint16_t payload_len) {
+  // header: sync + len
+  _send_buf[0] = SYNC_BYTE_1;
+  _send_buf[1] = SYNC_BYTE_2;
+  _send_buf[2] = (uint8_t)(body_len & 0xFF);
+  _send_buf[3] = (uint8_t)(body_len >> 8);
+
+  // body: cmd + seq + payload (memcpy)
+  // trailer: crc over body
+
+  Serial.write(_send_buf, frame_len);  // single call, no flush()
+}
+```
+
+### Python: Frame Parsing
+
+The Python client uses blocking `serial.read(n)` with timeout — eliminating the 50ms poll sleep from the JSON-RPC implementation. The sync detection mirrors the firmware's state machine:
+
+```python
+def _read_frame(self, timeout):
+    # sync — state machine matching firmware
+    state = 'SYNC1'
+    while True:
+        b = self.serial.read(1)
+        if len(b) == 0:
+            return None, None, None  # timeout
+        if state == 'SYNC1':
+            if b[0] == SYNC_BYTE_1:
+                state = 'SYNC2'
+        elif state == 'SYNC2':
+            if b[0] == SYNC_BYTE_2:
+                break  # synced
+            elif b[0] != SYNC_BYTE_1:
+                state = 'SYNC1'
+            # else: another 0xAA, stay in SYNC2
+
+    # length, body, crc — all blocking reads
+    body = self.serial.read(body_len)
+    # ...CRC check...
+    return cmd, seq, payload
+```
+
+### CRC-16/CCITT
+
+Both sides use identical CRC-16/CCITT implementations (poly `0x1021`, init `0xFFFF`), bit-by-bit without a lookup table. The standard test vector `"123456789"` produces `0x29B1` — validated by unit tests on the Python side.
+
+```cpp
+// Firmware (C++)
+static uint16_t crc16(const uint8_t* data, uint16_t len) {
+  uint16_t crc = 0xFFFF;
+  for (uint16_t i = 0; i < len; i++) {
+    crc ^= (uint16_t)data[i] << 8;
+    for (uint8_t bit = 0; bit < 8; bit++) {
+      crc = (crc & 0x8000) ? (crc << 1) ^ 0x1021 : crc << 1;
+    }
+  }
+  return crc;
+}
+```
+
+```python
+# Python
+def crc16(data: bytes) -> int:
+    crc = 0xFFFF
+    for byte in data:
+        crc ^= byte << 8
+        for _ in range(8):
+            crc = ((crc << 1) ^ 0x1021) if (crc & 0x8000) else (crc << 1)
+            crc &= 0xFFFF
+    return crc
+```
 
 ### Wire Bytes Comparison
 
@@ -197,9 +345,29 @@ The original 10x projection was for MEGA (ArduinoJson ~100ms/page). On DUE it wa
 | | Before | After | Saved |
 |---|---|---|---|
 | Flash | 50,936 B (9%) | 34,936 B (6%) | **16,000 B (-31%)** |
-| RAM | TODO | TODO | TODO |
 
 ArduinoJson library dependency eliminated entirely.
+
+```
+$ ./eeprom_programmer_cli/cli.py /dev/cu.usbmodem2101 -p AT28C64 --write test_bin/64_the_red_migration.bin
+connect programmer: /dev/cu.usbmodem2101
+programmer_settings: {'board_wiring_type': 28, 'max_page_size': 64}
+connect programmer: DONE, 0.22 sec
+init device: AT28C64
+chip settings: {'memory_size': 8192}
+init device: DONE
+write operation: test_bin/64_the_red_migration.bin
+erase operation
+erase pattern: 0xFF
+set_write_mode: WRITE mode is ON for 64 bytes pages
+erase operation: DONE, 5.77 sec
+write operation: started
+set_write_mode: WRITE mode is ON for 64 bytes pages
+write operation: DONE, 5.35 sec
+verify operation: started
+set_read_mode: READ mode is ON for 64 bytes pages
+verify operation: DONE, 1.58 sec
+```
 
 
 ## Bugs Found During Review
@@ -208,15 +376,26 @@ The iterative review process (write → challenge → fix → re-challenge) caug
 
 ### Firmware (`binary_protocol.h`)
 
-1. **WAIT_SYNC2 missed valid sync**: `0xAA 0xAA 0x55` failed to sync — the second `0xAA` reset to WAIT_SYNC1 instead of staying in WAIT_SYNC2. Any stray `0xAA` byte before a valid frame would cause the frame to be missed.
+1. **WAIT_SYNC2 missed valid sync**: `0xAA 0xAA 0x55` failed to sync — the second `0xAA` reset to WAIT_SYNC1 instead of staying in WAIT_SYNC2. Any stray `0xAA` byte before a valid frame would cause the frame to be missed. During DUE's reset, garbage bytes on the serial line can include `0xAA`, making this a real-world failure mode. The fix: stay in WAIT_SYNC2 when another `0xAA` arrives, instead of resetting.
 2. **Multiple Serial.write() calls per frame**: 7 individual calls per frame, each with function call overhead and potentially triggering separate USB packets on DUE's Programming Port. Fixed: build complete frame in a contiguous buffer, single Serial.write() call.
 3. **No bounds check in _send_frame**: a payload exceeding 128 bytes would overflow `_send_buf` via memcpy. Fixed: early return if frame exceeds `MAX_SEND_FRAME_SIZE`.
 4. **Serial.flush() blocking on hot path**: `flush()` waits for TX buffer to drain — ~6ms of CPU blocking per page at 115200 baud. Over 128 pages (8KB read), that's ~800ms wasted. Removed: TX drains asynchronously via hardware UART.
 
 ### Python Client (`binary_protocol/client.py`)
 
-5. **SEQ not validated in send_command**: stale responses from previous commands accepted silently. Two consecutive READ_PAGE commands with different page numbers could return the wrong page's data — silent data corruption.
-6. **Error frame bypassed SEQ check**: `_handle_error()` raised an exception before the SEQ validation ran. A stale error from a previous command was accepted as the current command's error.
+5. **SEQ not validated in send_command**: stale responses from previous commands accepted silently. Two consecutive READ_PAGE commands with different page numbers could return the wrong page's data — **silent data corruption**. This is the most dangerous class of bug: no error, no timeout, just wrong data written to your EEPROM. The fix: compare `resp_seq` to the expected `seq` before accepting any response.
+
+6. **Error frame bypassed SEQ check**: after fixing #5, the error path still skipped validation because `_handle_error()` raised before the SEQ check ran:
+
+    ```python
+    # Bug: error checked BEFORE seq
+    if resp_cmd == CMD_ERROR:
+        self._handle_error(resp_payload)  # raises, seq never checked
+
+    if resp_seq != seq:  # never reached for errors
+    ```
+
+    Fixed by reordering — SEQ check first, then error handling.
 7. **No upper bound on body_len in _read_frame**: a corrupted LEN field of 0xFFFF would cause `serial.read(65535)` — 64KB allocation and a long blocking read. Fixed: cap at `MAX_BODY_SIZE`.
 8. **Sync detection was fragile nested loops**: 25 lines of nested while loops with a shared `b3` variable. Replaced with a clean 12-line state machine matching the firmware's pattern.
 
