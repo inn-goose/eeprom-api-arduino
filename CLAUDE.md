@@ -21,7 +21,8 @@ All logic lives in header files — no `.cpp` files. The `.ino` includes everyth
 - `eeprom_programmer_lib.h` — core `EepromProgrammer` class: address/data bus GPIO, read/write byte operations, write completion polling
 - `chip_wiring.h` — per-chip pin mappings using **DIP pin numbers** (1-24 or 1-28) and `ChipWiringController`
 - `board_wiring.h` — maps **DIP pin positions to Arduino GPIO numbers** for DIP24 and DIP28 socket layouts
-- `serial_json_rpc_lib.h` — JSON-RPC 2.0 protocol handler over Serial, vendored locally (origin: `inn-goose/serial-json-rpc-arduino`). Depends on ArduinoJson library. 350-byte receive buffer, 115200 baud.
+- `serial_json_rpc_lib.h` — JSON-RPC 2.0 protocol handler over Serial, vendored locally (origin: `inn-goose/serial-json-rpc-arduino`). Depends on ArduinoJson library. 350-byte receive buffer, 115200 baud. **Being replaced by binary protocol.**
+- `binary_protocol.h` — binary serial protocol handler. Frame format: `[0xAA][0x55][LEN_L][LEN_H][BODY...][CRC_L][CRC_H]`, CRC-16/CCITT, state machine receiver. No external dependencies. 68-byte receive buffer, 130-byte send buffer. **Not yet wired — included but unused.**
 
 **Two-level pin mapping** (non-obvious): chip wiring tables define which DIP pin number corresponds to each logical function (A0, A1, IO0, !CE, etc.). The board wiring table then resolves DIP pin positions to physical Arduino GPIO numbers. Adding a new chip means defining its DIP-pin-to-function mapping in `chip_wiring.h`; changing the Arduino board means updating the DIP-to-GPIO table in `board_wiring.h`.
 

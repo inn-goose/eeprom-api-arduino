@@ -1,6 +1,7 @@
 #include "board_wiring.h"
 #include "eeprom_programmer_lib.h"
 #include "serial_json_rpc_lib.h"
+#include "binary_protocol.h"
 
 using namespace EepromProgrammerLibrary;
 using namespace BoardWiring;

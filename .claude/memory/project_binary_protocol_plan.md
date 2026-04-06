@@ -12,11 +12,15 @@ Replace JSON-RPC + ArduinoJson with a binary serial protocol. Eliminates the onl
 
 ## Baseline Performance (DUE + AT28C64 + ArduinoJson v7.4.2)
 
+Measured 2026-04-06:
+
 | Operation | Time |
 |---|---|
-| Read 8KB | 13.90s |
-| Write 8KB | 20.72s |
-| Erase 8KB | 20.74s |
+| Read 8KB | 6.96s |
+| Erase 8KB | 13.85s |
+| Write only 8KB | 12.91s |
+| Write + in-session verify | 19.88s |
+| Full (erase + write + verify) | 33.74s |
 
 ## Protocol Design
 
@@ -59,7 +63,8 @@ Replace JSON-RPC + ArduinoJson with a binary serial protocol. Eliminates the onl
 - CRC-16/CCITT bit-by-bit — no lookup table, saves 256B flash
 - SEQ byte — detects stale responses after timeout/retry
 - Little-endian — native on both AVR and ARM
-- Receive buffer: 68 bytes (vs current 350). Send buffer: 130 bytes.
+- Single Serial.write() per frame — full frame built in contiguous buffer, no flush()
+- Receive buffer: 68 bytes (vs current 350). Send buffer: 136 bytes (full frame).
 
 ### Board State Machine
 
@@ -71,9 +76,24 @@ States: SYNC1 → SYNC2 → LEN_L → LEN_H → BODY (N bytes) → CRC_L → CRC
 
 Blocking `serial.read(n)` with timeout — eliminates the 50ms poll sleep.
 
-## Implementation Steps (incremental, 6 commits)
+## Implementation Progress
 
-1. Create `eeprom_programmer/binary_protocol.h` (additive, not wired)
+### Step 1: DONE — `binary_protocol.h` created, included in .ino but not wired
+
+Bugs found and fixed during review:
+- **WAIT_SYNC2 missed valid sync**: `0xAA 0xAA 0x55` failed to sync because second 0xAA reset to WAIT_SYNC1. Fixed: stay in WAIT_SYNC2 on 0xAA.
+- **Multiple Serial.write() calls per frame**: 7 calls per frame, each with function call overhead and potential separate USB packets. Fixed: build full frame in contiguous `_send_buf`, single Serial.write().
+- **No bounds check in _send_frame**: buffer overflow if payload exceeded 128 bytes. Fixed: early return if frame_len > MAX_SEND_FRAME_SIZE.
+- **Serial.flush() blocking on hot path**: ~6ms per page of CPU blocking while TX drains. Removed — TX drains asynchronously via hardware.
+
+Known acceptable limitations:
+- No receive timeout (stuck state machine on partial frames) — acceptable for USB serial
+- VLA in send_error — GCC extension, consistent with codebase style
+- CRC doesn't cover LEN field — corruption detected indirectly via CRC mismatch
+- Boot frame fire-and-forget — same as JSON-RPC, handled by host init timeout
+
+### Remaining Steps
+
 2. Create `eeprom_programmer_cli/binary_protocol/client.py` (additive, not wired)
 3. Switchover: wire binary protocol in `.ino` + `eeprom_programmer_client.py` (atomic)
 4. Delete `serial_json_rpc_lib.h` and `serial_json_rpc/` directory
@@ -85,14 +105,13 @@ CLAUDE.md updated with every commit.
 
 | File | Action |
 |---|---|
-| `eeprom_programmer/binary_protocol.h` | CREATE |
-| `eeprom_programmer/eeprom_programmer.ino` | MODIFY |
+| `eeprom_programmer/binary_protocol.h` | CREATE — DONE |
+| `eeprom_programmer/eeprom_programmer.ino` | MODIFY (include added) — DONE |
 | `eeprom_programmer_cli/binary_protocol/__init__.py` | CREATE |
 | `eeprom_programmer_cli/binary_protocol/client.py` | CREATE |
 | `eeprom_programmer_cli/core/eeprom_programmer_client.py` | MODIFY |
 | `eeprom_programmer/serial_json_rpc_lib.h` | DELETE |
 | `eeprom_programmer_cli/serial_json_rpc/` | DELETE |
-| `eeprom_programmer/eeprom_programmer_lib.h` | MODIFY (pow, micros fixes) |
 
 ## Verification
 
@@ -101,4 +120,4 @@ CLAUDE.md updated with every commit.
 3. Full erase → write → in-session-verify cycle on AT28C64
 4. Compare performance to baseline
 
-**How to apply:** Full plan file at ~/.claude/plans/tender-weaving-nebula.md. This memory is a summary for future sessions.
+**How to apply:** This memory tracks migration progress. Check step status before continuing work.

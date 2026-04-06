@@ -7,4 +7,6 @@
 - [WE pin protection](project_we_pin_protection.md) — deep research: ESD diodes are root cause, no pull-up works on DUE
 - [Binary protocol plan](project_binary_protocol_plan.md) — protocol spec and 6-commit incremental migration plan
 - [Blog: binary migration](project_blog_binary_migration.md) — datapoints and structure for blog post about the migration
+- [Baseline performance](project_baseline_performance.md) — DUE+AT28C64 pre-migration: read 7s, write 13s, full 34s
+- [WE jumper prompting](feedback_we_jumper.md) — don't double-ask about jumper state, trust "go"
 - [Commit separation](feedback_commit_separation.md) — never mix .claude/ context with source code in same commit

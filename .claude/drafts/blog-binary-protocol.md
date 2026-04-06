@@ -60,11 +60,11 @@ Additional concerns:
 
 | Operation | Time |
 |---|---|
-| Read 8KB | 13.90s |
-| Erase 8KB | 20.73s |
-| Write 8KB | 20.80s |
-| Verify 8KB | 13.89s |
-| **Write + Verify (full cycle)** | **55.4s** |
+| Read 8KB | 6.96s |
+| Erase 8KB | 13.85s |
+| Write only 8KB | 12.91s |
+| Write + in-session verify | 19.88s (12.87 + 7.01) |
+| **Full (erase + write + verify)** | **33.74s** (13.86 + 12.91 + 6.97) |
 
 Firmware size:
 - Flash: TODO bytes (XX% of DUE capacity)
@@ -154,11 +154,11 @@ TODO: highlight what made this safe — commits 1-2 add code without changing be
 
 | Operation | Before | After | Speedup |
 |---|---|---|---|
-| Read 8KB | 13.90s | TODO | TODO |
-| Erase 8KB | 20.73s | TODO | TODO |
-| Write 8KB | 20.80s | TODO | TODO |
-| Verify 8KB | 13.89s | TODO | TODO |
-| **Write + Verify** | **55.4s** | **TODO** | **TODO** |
+| Read 8KB | 6.96s | TODO | TODO |
+| Erase 8KB | 13.85s | TODO | TODO |
+| Write only 8KB | 12.91s | TODO | TODO |
+| Write + in-session verify | 19.88s | TODO | TODO |
+| **Full (erase + write + verify)** | **33.74s** | **TODO** | **TODO** |
 
 Firmware size:
 - Flash: TODO bytes (saved TODO bytes / TODO%)
