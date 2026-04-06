@@ -79,8 +79,9 @@ Only dependency: `pyserial==3.4` (in `env/requirements_cli.txt`).
 ```bash
 python3 -m serial.tools.list_ports                                              # find serial port
 ./eeprom_programmer_cli/cli.py <port> -p <chip> --read <file>                   # read chip to file
-./eeprom_programmer_cli/cli.py <port> -p <chip> --write <file>                  # erase + write file to chip
-./eeprom_programmer_cli/cli.py <port> -p <chip> --write <file> --skip-erase     # write without erase
+./eeprom_programmer_cli/cli.py <port> -p <chip> --write <file>                  # erase + write + verify
+./eeprom_programmer_cli/cli.py <port> -p <chip> --write <file> --skip-verify    # erase + write without verify
+./eeprom_programmer_cli/cli.py <port> -p <chip> --write <file> --skip-erase     # write + verify without erase
 ./eeprom_programmer_cli/cli.py <port> -p <chip> --erase --erase-pattern FF      # erase with pattern
 ./eeprom_programmer_cli/cli.py <port> -p <chip> --verify <file>                 # read and compare to file
 ```

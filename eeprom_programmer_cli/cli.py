@@ -56,7 +56,8 @@ def read(programmer: EepromProgrammerClient, filename: str, collect_performance:
     print(f"read operation: DONE, {elapsed:.02f} sec")
 
 
-def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: str, skip_erase: bool, collect_performance: bool):
+def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: str, skip_erase: bool,
+          skip_verify: bool, collect_performance: bool):
     print(f"write operation: {filename}")
 
     if not filename:
@@ -75,6 +76,11 @@ def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: 
         print(
             f"WARNING incorrect data size: {len(input_data)} / chip memory size is {memory_size}")
 
+    # resolve erase pattern for padding
+    erase_pattern = 0xFF
+    if erase_pattern_str:
+        erase_pattern = int(erase_pattern_str, 16)
+
     if not skip_erase:
         erase(programmer, erase_pattern_str, collect_performance)
 
@@ -89,6 +95,38 @@ def write(programmer: EepromProgrammerClient, filename: str, erase_pattern_str: 
 
     elapsed = time.time() - ts
     print(f"write operation: DONE, {elapsed:.02f} sec")
+
+    if not skip_verify:
+        # pad input data to full chip size with erase pattern
+        if len(input_data) < memory_size:
+            expected_data = input_data + bytes([erase_pattern] * (memory_size - len(input_data)))
+        else:
+            expected_data = input_data
+        verify_data(programmer, expected_data, collect_performance)
+
+
+def verify_data(programmer: EepromProgrammerClient, expected_data: bytes, collect_performance: bool):
+    """Read chip contents and compare against expected data (in-session, no reconnect)."""
+    print("verify operation: started")
+
+    ts = time.time()
+
+    try:
+        actual_data = programmer.read_data(collect_performance)
+    except Exception as ex:
+        raise CliError(f"verify operation: read failed, {str(ex)}")
+
+    if expected_data != actual_data:
+        # find first mismatch for diagnostics
+        for i in range(min(len(expected_data), len(actual_data))):
+            if expected_data[i] != actual_data[i]:
+                print(f"verify operation: first mismatch at address 0x{i:04X} "
+                      f"(expected 0x{expected_data[i]:02X}, got 0x{actual_data[i]:02X})")
+                break
+        raise CliError("verify operation: failed, mismatched data")
+
+    elapsed = time.time() - ts
+    print(f"verify operation: DONE, {elapsed:.02f} sec")
 
 
 def verify(programmer: EepromProgrammerClient, filename: str, collect_performance: bool):
@@ -110,20 +148,7 @@ def verify(programmer: EepromProgrammerClient, filename: str, collect_performanc
         raise CliError(
             f"incorrect data size: {len(input_data)} / chip memory size is {memory_size}")
 
-    print("read operation: started")
-
-    ts = time.time()
-
-    try:
-        output_data = programmer.read_data(collect_performance)
-    except Exception as ex:
-        raise CliError(f"read operation: failed, {str(ex)}")
-
-    if input_data != output_data:
-        raise CliError(f"verify operation: failed, mismatched data")
-
-    elapsed = time.time() - ts
-    print(f"verify operation: DONE, {elapsed:.02f} sec")
+    verify_data(programmer, input_data, collect_performance)
 
 
 def erase(programmer: EepromProgrammerClient, erase_pattern_str: str, collect_performance: bool):
@@ -173,7 +198,8 @@ def cli() -> int:
                         metavar="<filename>", help="Write to the device using this file")
     parser.add_argument("-e", "--skip-erase",
                         action="store_true", help="Do NOT erase the device")
-    # parser.add_argument("-v", "--skip_verify", action="store_true", help="Do NOT verify after write")
+    parser.add_argument("-v", "--skip-verify",
+                        action="store_true", help="Do NOT verify after write")
     parser.add_argument("-E", "--erase", action="store_true",
                         help="Just erase the device")
     parser.add_argument("--erase-pattern", type=str, required=False, metavar="<hex>",
@@ -200,7 +226,7 @@ def cli() -> int:
 
     elif args.write is not None:
         write(programmer, args.write, args.erase_pattern, args.skip_erase,
-              args.collect_performance)
+              args.skip_verify, args.collect_performance)
 
     elif args.verify is not None:
         verify(programmer, args.verify, args.collect_performance)
