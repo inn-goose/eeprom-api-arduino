@@ -270,6 +270,21 @@ class TestSendCommand(unittest.TestCase):
         self.assertIn("read failed", str(ctx.exception))
         self.assertIn("42", str(ctx.exception))
 
+    def test_error_response_with_wrong_seq_rejected(self):
+        """Stale error response should be caught by SEQ check before error handling."""
+        error_payload = (
+            bytes([CMD_READ_PAGE])
+            + struct.pack("<H", 42)
+            + b"stale error\x00"
+        )
+        # error with seq=5 but client expects seq=0
+        response = build_frame(CMD_ERROR, 0x05, error_payload)
+        client = self._make_client_with_response(response)
+
+        with self.assertRaises(BinaryProtocolClientError) as ctx:
+            client.send_command(CMD_READ_PAGE, struct.pack("<H", 0))
+        self.assertIn("seq mismatch", str(ctx.exception))
+
     def test_send_command_wrong_response_cmd(self):
         # respond with wrong command
         response = build_frame(0x84, 0x00, b"")  # SET_WRITE_MODE resp instead of READ_PAGE resp

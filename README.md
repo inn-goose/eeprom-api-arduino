@@ -8,7 +8,7 @@ An Arduino-based parallel EEPROM programmer for the AT28Cxx chip family (AT28C04
 > [!IMPORTANT]
 > This project concerns **external** EEPROM chips, not the built-in Arduino EEPROM memory.
 
-The firmware is flashed onto an Arduino MEGA or DUE. The EEPROM chip is connected to the extended pin header (pins 22-53), and the Python CLI communicates over Serial JSON-RPC to erase, write, read, and verify binary data. The CLI interface is modeled after [`minipro`](https://formulae.brew.sh/formula/minipro) (XGecu programmer).
+The firmware is flashed onto an Arduino MEGA or DUE. The EEPROM chip is connected to the extended pin header (pins 22-53), and the Python CLI communicates over a binary serial protocol to erase, write, read, and verify binary data. The CLI interface is modeled after [`minipro`](https://formulae.brew.sh/formula/minipro) (XGecu programmer).
 
 A companion blog series documents the development: [EEPROM Programmer posts on goose.sh](https://goose.sh/tags/eeprom-programmer/).
 
@@ -29,18 +29,13 @@ Details in the [EEPROM Programmer: Supported Chips](https://goose.sh/blog/eeprom
 
 The programmer's performance is strongly dependent on the Arduino platform; the DUE is ~30% faster than the MEGA for reads, and significantly faster for writes due to page write support. The performance measurement details are described in the [EEPROM Programmer Performance](https://goose.sh/blog/eeprom-programmer-8-supported-chips/#eeprom-programmer-performance) post.
 
-### Arduino MEGA, 16 MHz
+### Arduino DUE, 84 MHz (binary protocol)
 
-| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec) |
+| Chip | Size | Read (sec) | Erase + Write + Verify (sec) |
 | -- | :--: | :--: | :--: |
-| AT28C04 | 512 x 8 | 1.4 | 1.8 |
-| AT28C16 | 2K x 8 | 5.5 | 14 |
-| AT28C64 | 8K x 8 | 21 | 28* |
-| AT28C256 | 32K x 8 | 84 | 305 |
+| AT28C64 | 8K x 8 | 1.6 | 12.7 |
 
-(*) if [RDY/!BUSY polling](https://goose.sh/blog/eeprom-programmer-6-data-polling-vs-rdy-busy/#rdybusy-pin-polling) mode is enabled
-
-### Arduino DUE, 84 MHz
+### Arduino DUE, 84 MHz (JSON-RPC, legacy)
 
 | Chip | Size | Full Memory Read (sec) | Full Memory Write (sec) |
 | -- | :--: | :--: | :--: |
@@ -50,6 +45,17 @@ The programmer's performance is strongly dependent on the Arduino platform; the 
 | AT28C256 | 32K x 8 | 56 | 85* |
 
 (*) if [page write](https://goose.sh/blog/eeprom-programmer-7-page-write/) mode is enabled.
+
+### Arduino MEGA, 16 MHz (JSON-RPC, legacy)
+
+| Chip | Size | Full Memory Read (sec) | Full Memory Write (sec) |
+| -- | :--: | :--: | :--: |
+| AT28C04 | 512 x 8 | 1.4 | 1.8 |
+| AT28C16 | 2K x 8 | 5.5 | 14 |
+| AT28C64 | 8K x 8 | 21 | 28* |
+| AT28C256 | 32K x 8 | 84 | 305 |
+
+(*) if [RDY/!BUSY polling](https://goose.sh/blog/eeprom-programmer-6-data-polling-vs-rdy-busy/#rdybusy-pin-polling) mode is enabled
 
 
 
@@ -113,9 +119,7 @@ In the photographs, a short breadboard was used for the `DIP24` wiring, along wi
 
 A Python CLI enables reading and writing large volumes of data. When using only the Arduino, it is not possible to program a 64 KB chip, as this does not fit into the MEGA's memory.
 
-Serial JSON-RPC is used to implement the interface between the CLI and the programmer. On the one hand, this simplifies the interface and accelerates the addition of new functionality; on the other, it introduces certain limitations due to significant protocol overhead. Details of using this protocol are described in the [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
-
-GitHub page for the library: [`Serial JSON RPC for Arduino`](https://github.com/inn-goose/serial-json-rpc-arduino)
+The CLI communicates with the firmware over a binary serial protocol with CRC-16 integrity checking. The previous JSON-RPC implementation is described in the [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post.
 
 ### Initialization
 
@@ -327,7 +331,9 @@ xxd tmp/dump_xgecu.bin > tmp/dump_xgecu.hex
 vimdiff tmp/dump_eeprom.hex tmp/dump_xgecu.hex
 ```
 
-### JSON-RPC API
+### JSON-RPC API (legacy, no longer active)
+
+The firmware previously used JSON-RPC over serial. These commands no longer work with the current binary protocol firmware but are preserved here for reference. See the [Implementing Serial JSON-RPC API](https://goose.sh/blog/eeprom-programmer-4-serial-json-rpc-api/) post for details.
 
 Set Arduino IDE's *Serial Monitor* on `115200` baud
 

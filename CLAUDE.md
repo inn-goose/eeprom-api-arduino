@@ -17,12 +17,12 @@ The CLI interface is modeled after `minipro` (XGecu programmer). A companion blo
 
 All logic lives in header files — no `.cpp` files. The `.ino` includes everything.
 
-- `eeprom_programmer.ino` — main sketch; wires JSON-RPC methods (`init_chip`, `set_read_mode`, `read_page`, `set_write_mode`, `write_page`, `get_read_perf`, `get_write_perf`) to the `EepromProgrammer` class
+- `eeprom_programmer.ino` — main sketch; wires binary protocol commands (`init_chip`, `set_read_mode`, `read_page`, `set_write_mode`, `write_page`, `get_read_perf`, `get_write_perf`) to the `EepromProgrammer` class
 - `eeprom_programmer_lib.h` — core `EepromProgrammer` class: address/data bus GPIO, read/write byte operations, write completion polling
 - `chip_wiring.h` — per-chip pin mappings using **DIP pin numbers** (1-24 or 1-28) and `ChipWiringController`
 - `board_wiring.h` — maps **DIP pin positions to Arduino GPIO numbers** for DIP24 and DIP28 socket layouts
-- `serial_json_rpc_lib.h` — JSON-RPC 2.0 protocol handler over Serial, vendored locally (origin: `inn-goose/serial-json-rpc-arduino`). Depends on ArduinoJson library. 350-byte receive buffer, 115200 baud. **Being replaced by binary protocol.**
-- `binary_protocol.h` — binary serial protocol handler. Frame format: `[0xAA][0x55][LEN_L][LEN_H][BODY...][CRC_L][CRC_H]`, CRC-16/CCITT, state machine receiver. No external dependencies. 68-byte receive buffer, 130-byte send buffer. **Not yet wired — included but unused.**
+- `binary_protocol.h` — binary serial protocol handler. Frame format: `[0xAA][0x55][LEN_L][LEN_H][BODY...][CRC_L][CRC_H]`, CRC-16/CCITT, state machine receiver. No external dependencies. 68-byte receive buffer, 136-byte send buffer.
+- `serial_json_rpc_lib.h` — **DEAD CODE, pending deletion.** Former JSON-RPC 2.0 protocol handler. Replaced by `binary_protocol.h`.
 
 **Two-level pin mapping** (non-obvious): chip wiring tables define which DIP pin number corresponds to each logical function (A0, A1, IO0, !CE, etc.). The board wiring table then resolves DIP pin positions to physical Arduino GPIO numbers. Adding a new chip means defining its DIP-pin-to-function mapping in `chip_wiring.h`; changing the Arduino board means updating the DIP-to-GPIO table in `board_wiring.h`.
 
@@ -31,10 +31,12 @@ All logic lives in header files — no `.cpp` files. The `.ino` includes everyth
 ### CLI (`eeprom_programmer_cli/`)
 
 - `cli.py` — argparse entry point with `--read`, `--write`, `--erase`, `--verify` commands
-- `core/eeprom_programmer_client.py` — `EepromProgrammerClient`: wraps JSON-RPC calls, handles 64-byte page read/write
-- `serial_json_rpc/client.py` — `SerialJsonRpcClient`: pyserial connection, JSON-RPC request/response framing
+- `core/eeprom_programmer_client.py` — `EepromProgrammerClient`: wraps binary protocol calls, handles 64-byte page read/write
+- `binary_protocol/client.py` — `BinaryProtocolClient`: pyserial connection, binary frame building/parsing, CRC-16/CCITT
+- `binary_protocol/test_client.py` — 32 unit tests for CRC, frame building, frame parsing, send_command, cross-validation
+- `serial_json_rpc/client.py` — **DEAD CODE, pending deletion.** Former JSON-RPC client. Replaced by `binary_protocol/client.py`.
 
-**Data flow**: CLI sends JSON-RPC over serial -> firmware parses and dispatches -> firmware manipulates EEPROM via GPIO -> JSON-RPC response back. The architecture follows a "smart client, simple board" pattern — the CLI holds business logic while the firmware exposes only basic page read/write primitives.
+**Data flow**: CLI sends binary frames over serial -> firmware state machine parses and dispatches -> firmware manipulates EEPROM via GPIO -> binary response frame back. The architecture follows a "smart client, simple board" pattern — the CLI holds business logic while the firmware exposes only basic page read/write primitives.
 
 ### Backup versions (`bak/`)
 
@@ -109,50 +111,25 @@ Add `--collect-performance` to any operation for timing data.
 
 - **`_data_polling` toggles entire data bus twice per byte**: switches all 8 data pins to READ mode and back to WRITE mode for each poll cycle. Each switch does 8x `pinMode` + `digitalWrite` calls. Affects AT28C04, AT28C16, AT28C256-on-MEGA (chips without RDY/!BUSY pin).
 
-### Serial protocol: JSON-RPC performance analysis
+### Serial protocol: binary protocol performance
 
-**Where time goes** (AT28C256 read, per 64-byte page):
+The binary protocol replaced JSON-RPC + ArduinoJson, eliminating the only external firmware dependency.
 
-| Cost | MEGA (164ms/page) | DUE (109ms/page) |
-|---|---|---|
-| ArduinoJson parse+serialize+heap | ~102ms (62%) | ~53ms (48%) |
-| Serial wire (329 bytes at 115200) | ~29ms (17%) | ~29ms (26%) |
-| Python 50ms poll sleep (avg) | ~25ms (15%) | ~25ms (23%) |
-| GPIO (64 × digitalWrite/Read) | ~8ms (5%) | ~3ms (3%) |
+**Performance (DUE + AT28C64, 8KB):**
 
-The dominant cost is **ArduinoJson on the microcontroller**, not the serial wire. Each page requires heap-allocating `DynamicJsonDocument`s, building a `JsonArray` of 64 elements, serializing to decimal-string JSON, then `clear()` + `garbageCollect()`. On MEGA's 16MHz AVR with software heap, this is ~100ms. Increasing baud rate alone barely helps (921600 baud + 5ms poll: MEGA drops from 84s → 61s, only 1.4x).
-
-**Binary protocol projected improvement** (with fixed Python polling):
-
-| Operation | Current | Binary projected | Speedup |
+| Operation | JSON-RPC | Binary | Speedup |
 |---|---|---|---|
-| MEGA read AT28C256 | 84s | ~8s | ~10x |
-| DUE read AT28C256 | 56s | ~5s | ~11x |
-| MEGA write AT28C256 | 305s | ~23s | ~13x |
-| DUE write AT28C256 | 85s | ~7s | ~12x |
+| Read | 6.96s | 1.58s | 4.4x |
+| Erase | 13.85s | 5.77s | 2.4x |
+| Write only | 12.91s | 5.35s | 2.4x |
+| Full (erase+write+verify) | 33.74s | 12.70s | 2.7x |
 
-Wire bytes per page: JSON ~323 bytes vs binary ~69 bytes (4.7x). But the 10x total speedup comes from eliminating both wire overhead AND ArduinoJson CPU cost.
+Write speedup is limited by EEPROM hardware write time (~400-540μs/byte) — a fixed floor regardless of protocol. Read is almost pure protocol overhead, hence the higher speedup.
 
-**Why JSON-RPC is still useful despite the overhead:**
-- **Serial Monitor debugging**: type raw JSON in Arduino Serial Monitor to test wiring, new chips, or diagnose issues — no tooling needed. Critical for hardware development.
-- **Self-describing errors**: `"Failed to init AT28C256 chip with error: 12"` vs an opcode. During development of new chip support, this matters.
-- **Minimal client code**: Python client is ~130 lines of `json.dumps`/`json.loads`. Binary needs struct packing, checksums, escape sequences.
-- **Development velocity**: adding a new RPC method = string comparison + handler. No byte-level protocol spec or endianness concerns.
-- **Blog series**: the companion posts use JSON-RPC in Serial Monitor as a teaching tool.
-- **Use frequency**: programming an EEPROM is an occasional operation, not a tight loop. 84s vs 8s is better but both are "start and wait."
+**Flash: 50,936 → 34,936 bytes (-31%)** — ArduinoJson eliminated.
 
-**Possible hybrid approach**: keep JSON-RPC for control commands (`init_chip`, `set_read_mode`, `set_write_mode` — called once per operation, debuggability matters) and use binary only for bulk transfer (`read_page`, `write_page` — called hundreds of times, speed matters).
+Wire bytes per 64-byte page: JSON ~378B vs binary ~82B (read), JSON ~400B vs binary ~82B (write).
 
-**Other serial issues:**
-- **CLI polls at 50ms intervals**: `_read_response()` in `client.py` sleeps 50ms between serial checks. Average waste ~25ms/page. Over 512 pages adds ~12 seconds. Fix: `serial.read_until(b'\n')` or reduce sleep to 1-5ms.
+**Remaining serial characteristics:**
 - **Fully synchronous, one round-trip per page**: no pipelining. Each page is send-request → wait → receive-response → next.
-
-### Library compatibility
-
-- **ArduinoJson v7 breaking change**: `DynamicJsonDocument` (used throughout `serial_json_rpc_lib.h`) was removed in ArduinoJson v7, replaced by `JsonDocument`. Library Manager now defaults to v7. ArduinoJson v7 is also larger — v6 recommended for 8-bit boards (MEGA).
-- **No `while (!Serial)` for native USB boards**: `serial_json_rpc_lib.h` calls `Serial.begin()` without waiting for USB enumeration. On DUE/Giga native USB port, the initial `programmer_settings` message sent in `setup()` could be lost. Works in practice due to the 3-second `init_timeout` on the Python side, but is a race condition.
-
-### Buffer margins
-
-- **350-byte buffer is tight for `write_page`**: a worst-case request (64 bytes of `255`, page_no in hundreds) is ~320 bytes. Margin is ~30 bytes. MEGA and DUE have significantly more RAM than UNO — buffer could be increased.
-- **`json_array_to_byte_array` undersizes its JsonDocument**: allocates `raw_json.length()` bytes, but ArduinoJson v6 needs additional overhead for its internal tree. Works for 64-byte pages but is technically underprovided.
+- **No `while (!Serial)` for native USB boards**: `binary_protocol.h` calls `Serial.begin()` without waiting for USB enumeration. On DUE/Giga native USB port, the BOOT frame sent in `setup()` could be lost. Works in practice due to the 3-second `init_timeout` on the Python side.

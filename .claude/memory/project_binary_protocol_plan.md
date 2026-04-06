@@ -102,9 +102,35 @@ Bugs found and fixed during review:
 
 31 unit tests covering: CRC (7), frame building (3), frame parsing (10), send_command (8), CRC cross-validation (3).
 
+### Step 3: DONE — Switchover wired and tested
+
+Firmware rewired: `.ino` uses `BinaryProtocolBoard` command_handler instead of JSON-RPC rpc_processor.
+Python rewired: `eeprom_programmer_client.py` uses `BinaryProtocolClient` with typed binary commands.
+
+Bugs found and fixed during cross-component review:
+- **Error frame bypassed SEQ check**: `_handle_error()` raised before SEQ validation — stale error from previous command accepted. Fixed: SEQ check moved before error handling.
+- **Unknown command used error_code=0**: confused with SUCCESS. Fixed: changed to 0xFFFF.
+
+Known acceptable limitations:
+- INIT_CHIP null-termination not validated on firmware side — Python correctly sends null, bounded by buffer size
+- Protocol version received but not checked by Python client
+- Perf timings truncated from unsigned int to uint16 — values >65535μs would wrap, not reachable in practice
+- MAX_BODY_SIZE constant means different things (firmware=68 receive, Python=130 receive-from-firmware)
+
+Performance results (DUE + AT28C64 8KB):
+
+| Operation | Before | After | Speedup |
+|---|---|---|---|
+| Read | 6.96s | 1.58s | 4.4x |
+| Erase | 13.85s | 5.77s | 2.4x |
+| Write only | 12.91s | 5.35s | 2.4x |
+| Full cycle | 33.74s | 12.70s | 2.7x |
+| Flash size | 50,936 B | 34,936 B | -31% |
+
+32 unit tests passing.
+
 ### Remaining Steps
 
-3. Switchover: wire binary protocol in `.ino` + `eeprom_programmer_client.py` (atomic)
 4. Delete `serial_json_rpc_lib.h` and `serial_json_rpc/` directory
 5. Update README with new architecture + performance comparison
 
@@ -115,19 +141,12 @@ CLAUDE.md updated with every commit.
 | File | Action |
 |---|---|
 | `eeprom_programmer/binary_protocol.h` | CREATE — DONE |
-| `eeprom_programmer/eeprom_programmer.ino` | MODIFY (include added) — DONE |
+| `eeprom_programmer/eeprom_programmer.ino` | MODIFY — DONE (steps 1+3) |
 | `eeprom_programmer_cli/binary_protocol/__init__.py` | CREATE — DONE |
 | `eeprom_programmer_cli/binary_protocol/client.py` | CREATE — DONE |
 | `eeprom_programmer_cli/binary_protocol/test_client.py` | CREATE — DONE |
-| `eeprom_programmer_cli/core/eeprom_programmer_client.py` | MODIFY |
+| `eeprom_programmer_cli/core/eeprom_programmer_client.py` | MODIFY — DONE |
 | `eeprom_programmer/serial_json_rpc_lib.h` | DELETE |
 | `eeprom_programmer_cli/serial_json_rpc/` | DELETE |
-
-## Verification
-
-1. Compile for Arduino DUE — no ArduinoJson dependency
-2. Unit-test CRC on both sides
-3. Full erase → write → in-session-verify cycle on AT28C64
-4. Compare performance to baseline
 
 **How to apply:** This memory tracks migration progress. Check step status before continuing work.

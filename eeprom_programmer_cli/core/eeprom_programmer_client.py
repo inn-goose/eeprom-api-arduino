@@ -1,4 +1,10 @@
-from serial_json_rpc.client import SerialJsonRpcClient
+import struct
+
+from binary_protocol.client import (
+    BinaryProtocolClient, BinaryProtocolClientError,
+    CMD_INIT_CHIP, CMD_SET_READ_MODE, CMD_READ_PAGE,
+    CMD_SET_WRITE_MODE, CMD_WRITE_PAGE, CMD_GET_READ_PERF, CMD_GET_WRITE_PERF,
+)
 
 
 class EepromProgrammerClientError(Exception):
@@ -13,16 +19,16 @@ class EepromProgrammerClient:
         self._connect_programmer(port, baudrate, init_timeout)
 
     def _connect_programmer(self, port: str, baudrate: int, init_timeout: int):
-        self._json_rpc_client = SerialJsonRpcClient(
+        self._client = BinaryProtocolClient(
             port=port, baudrate=baudrate, init_timeout=float(init_timeout))
 
-        programmer_settings = self._json_rpc_client.init()
-        if not programmer_settings:
-            raise EepromProgrammerClientError("failed to connect programmer, empty settings returned")
+        boot_info = self._client.init()
+        if not boot_info:
+            raise EepromProgrammerClientError("failed to connect programmer, no BOOT frame")
 
         self.programmer_settings = {
-            "board_wiring_type": programmer_settings[0],
-            "max_page_size": programmer_settings[1],
+            "board_wiring_type": boot_info["board_wiring_type"],
+            "max_page_size": boot_info["max_page_size"],
         }
         print(f"programmer_settings: {self.programmer_settings}")
 
@@ -31,23 +37,28 @@ class EepromProgrammerClient:
 
     def init_chip(self, chip_type: str):
         try:
-            chip_settings = self._json_rpc_client.send_request("init_chip", [chip_type])
-        except Exception as ex:
+            payload = self._client.send_command(
+                CMD_INIT_CHIP, chip_type.encode("ascii") + b"\x00")
+        except BinaryProtocolClientError as ex:
             raise EepromProgrammerClientError(
                 f"failed to init {chip_type} chip with: {ex}")
-        if not chip_settings:
+
+        if len(payload) < 4:
             raise EepromProgrammerClientError(
                 f"empty chip settings for {chip_type}")
+
+        memory_size = struct.unpack("<I", payload[:4])[0]
         self.chip_settings = {
-            "memory_size": chip_settings[0],
+            "memory_size": memory_size,
         }
         print(f"chip settings: {self.chip_settings}")
 
     def _set_read_mode(self, page_size: int):
         try:
-            res = self._json_rpc_client.send_request("set_read_mode", [page_size])
-            print(f"set_read_mode: {res}")
-        except Exception as ex:
+            self._client.send_command(
+                CMD_SET_READ_MODE, struct.pack("<H", page_size))
+            print(f"set_read_mode: READ mode is ON for {page_size} bytes pages")
+        except BinaryProtocolClientError as ex:
             raise EepromProgrammerClientError(
                 f"failed to set READ mode with: {ex}")
 
@@ -62,12 +73,17 @@ class EepromProgrammerClient:
         if collect_performance:
             read_performance = []
 
-        output_data = []
+        output_data = bytearray()
         for page_no in range(pages_total):
-            resp = self._json_rpc_client.send_request("read_page", [page_no])
-            output_data += resp
+            resp = self._client.send_command(
+                CMD_READ_PAGE, struct.pack("<H", page_no))
+            if len(resp) != page_size:
+                raise EepromProgrammerClientError(
+                    f"read_page {page_no}: expected {page_size} bytes, got {len(resp)}")
+            output_data.extend(resp)
             if collect_performance:
-                read_performance.extend(self._json_rpc_client.send_request("get_read_perf", None))
+                perf_resp = self._client.send_command(CMD_GET_READ_PERF)
+                read_performance.extend(struct.unpack(f"<{len(perf_resp)//2}H", perf_resp))
 
         if collect_performance:
             print("AVG read time {:.2f} us".format(sum(read_performance) / len(read_performance)))
@@ -76,9 +92,10 @@ class EepromProgrammerClient:
 
     def _set_write_mode(self, page_size: int):
         try:
-            res = self._json_rpc_client.send_request("set_write_mode", [page_size])
-            print(f"set_write_mode: {res}")
-        except Exception as ex:
+            self._client.send_command(
+                CMD_SET_WRITE_MODE, struct.pack("<H", page_size))
+            print(f"set_write_mode: WRITE mode is ON for {page_size} bytes pages")
+        except BinaryProtocolClientError as ex:
             raise EepromProgrammerClientError(
                 f"failed to set WRITE mode with: {ex}")
 
@@ -92,18 +109,17 @@ class EepromProgrammerClient:
         # set WRITE mode
         self._set_write_mode(page_size)
 
-        # convert bytes to array
-        input_data = [b for b in input_data]
-
         if collect_performance:
             write_performance = []
 
         for page_no in range(pages_total):
             address = page_no * page_size
             page_data = input_data[address:(address+page_size)]
-            self._json_rpc_client.send_request("write_page", [page_no, page_data])
+            self._client.send_command(
+                CMD_WRITE_PAGE, struct.pack("<H", page_no) + page_data)
             if collect_performance:
-                write_performance.extend(self._json_rpc_client.send_request("get_write_perf", None))
+                perf_resp = self._client.send_command(CMD_GET_WRITE_PERF)
+                write_performance.extend(struct.unpack(f"<{len(perf_resp)//2}H", perf_resp))
 
         if collect_performance:
             print("AVG write time {:.2f} us".format(sum(write_performance) / len(write_performance)))

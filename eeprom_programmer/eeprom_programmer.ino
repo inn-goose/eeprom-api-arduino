@@ -1,11 +1,10 @@
 #include "board_wiring.h"
 #include "eeprom_programmer_lib.h"
-#include "serial_json_rpc_lib.h"
 #include "binary_protocol.h"
 
 using namespace EepromProgrammerLibrary;
 using namespace BoardWiring;
-using namespace SerialJsonRpcLibrary;
+using namespace BinaryProtocol;
 
 
 // EEPROM Programmer
@@ -17,144 +16,143 @@ using namespace SerialJsonRpcLibrary;
 static EepromProgrammer eeprom_programmer(BoardWiringType::DIP28);
 
 
-// Serial JSON RPC Processor
+// Binary Protocol Processor
 
-static SerialJsonRpcBoard rpc_board(rpc_processor);
+static BinaryProtocolBoard binary_board(command_handler);
 
-void rpc_processor(int request_id, const String &method, const String params[], int params_size) {
-  if (method == "init_chip") {
-    if (params_size != 1) {
-      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (chip_type)");
+void command_handler(uint8_t cmd, uint8_t seq, const uint8_t* payload, uint16_t payload_len) {
+  if (cmd == CMD_INIT_CHIP) {
+    // payload: chip_name (null-terminated string)
+    if (payload_len < 1) {
+      binary_board.send_error(cmd, seq, ErrorCode::CHIP_NOT_SUPPORTED, "empty chip name");
       return;
     }
-    String chip_type = params[0];
+    const char* chip_name = (const char*)payload;
 
-    ErrorCode code = eeprom_programmer.init_chip(chip_type);
+    ErrorCode code = eeprom_programmer.init_chip(String(chip_name));
     if (code != ErrorCode::SUCCESS) {
-      const size_t error_data_buf_size = 50;
-      char error_data_buf[error_data_buf_size];
-      snprintf(error_data_buf, error_data_buf_size, "Failed to init %s chip with error: %d", chip_type.c_str(), code);
-      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 10, "Programmer error", error_data_buf);
+      char buf[50];
+      snprintf(buf, sizeof(buf), "init failed: %d", code);
+      binary_board.send_error(cmd, seq, code, buf);
       return;
     }
 
-    long chip_settings[] = {
-      (long)eeprom_programmer.get_memory_size_bytes(),
+    // response payload: memory_size as uint32 LE (explicit serialization)
+    uint32_t mem_size = eeprom_programmer.get_memory_size_bytes();
+    uint8_t mem_size_le[4] = {
+      (uint8_t)(mem_size & 0xFF),
+      (uint8_t)((mem_size >> 8) & 0xFF),
+      (uint8_t)((mem_size >> 16) & 0xFF),
+      (uint8_t)((mem_size >> 24) & 0xFF),
     };
-    rpc_board.send_result_longs(request_id, chip_settings, sizeof(chip_settings) / sizeof(chip_settings[0]));
+    binary_board.send_response(cmd, seq, mem_size_le, 4);
 
-  } else if (method == "set_read_mode") {
-    if (params_size != 1) {
-      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (read_page_size_bytes)");
+  } else if (cmd == CMD_SET_READ_MODE) {
+    // payload: page_size as uint16 LE
+    if (payload_len < 2) {
+      binary_board.send_error(cmd, seq, ErrorCode::INVALID_PAGE_SIZE, "missing page_size");
       return;
     }
-    const int read_page_size_bytes = atoi(params[0].c_str());
+    uint16_t page_size = payload[0] | ((uint16_t)payload[1] << 8);
 
-    ErrorCode code = eeprom_programmer.set_read_mode(read_page_size_bytes);
+    ErrorCode code = eeprom_programmer.set_read_mode(page_size);
     if (code != ErrorCode::SUCCESS) {
-      const size_t error_data_buf_size = 70;
-      char error_data_buf[error_data_buf_size];
-      snprintf(error_data_buf, error_data_buf_size, "Failed to set READ mode for page size %d with error: %d", read_page_size_bytes, code);
-      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 20, "Programmer error", error_data_buf);
+      char buf[50];
+      snprintf(buf, sizeof(buf), "set_read_mode failed: %d", code);
+      binary_board.send_error(cmd, seq, code, buf);
       return;
     }
 
-    const size_t result_buf_size = 50;
-    char result_buf[result_buf_size];
-    snprintf(result_buf, result_buf_size, "READ mode is ON for %d bytes pages", read_page_size_bytes);
-    rpc_board.send_result_string(request_id, result_buf);
+    binary_board.send_response(cmd, seq, nullptr, 0);
 
-  } else if (method == "read_page") {
-    if (params_size != 1) {
-      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (page_no)");
+  } else if (cmd == CMD_READ_PAGE) {
+    // payload: page_no as uint16 LE
+    if (payload_len < 2) {
+      binary_board.send_error(cmd, seq, ErrorCode::INVALID_PAGE_NO, "missing page_no");
       return;
     }
-    const int page_no = atoi(params[0].c_str());
+    uint16_t page_no = payload[0] | ((uint16_t)payload[1] << 8);
 
     const size_t page_size = eeprom_programmer.get_page_size_bytes();
     uint8_t buffer[page_size];
 
     ErrorCode code = eeprom_programmer.read_page(page_no, buffer);
     if (code != ErrorCode::SUCCESS) {
-      const size_t error_data_buf_size = 70;
-      char error_data_buf[error_data_buf_size];
-      snprintf(error_data_buf, error_data_buf_size, "Failed to READ page %d with error: %d", page_no, code);
-      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 21, "Programmer error", error_data_buf);
+      char buf[50];
+      snprintf(buf, sizeof(buf), "read_page %d failed: %d", page_no, code);
+      binary_board.send_error(cmd, seq, code, buf);
       return;
     }
 
-    rpc_board.send_result_bytes(request_id, buffer, page_size);
+    binary_board.send_response(cmd, seq, buffer, page_size);
 
-  } else if (method == "set_write_mode") {
-    if (params_size != 1) {
-      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (write_page_size_bytes)");
+  } else if (cmd == CMD_SET_WRITE_MODE) {
+    // payload: page_size as uint16 LE
+    if (payload_len < 2) {
+      binary_board.send_error(cmd, seq, ErrorCode::INVALID_PAGE_SIZE, "missing page_size");
       return;
     }
-    const int write_page_size_bytes = atoi(params[0].c_str());
+    uint16_t page_size = payload[0] | ((uint16_t)payload[1] << 8);
 
-    ErrorCode code = eeprom_programmer.set_write_mode(write_page_size_bytes);
+    ErrorCode code = eeprom_programmer.set_write_mode(page_size);
     if (code != ErrorCode::SUCCESS) {
-      const size_t error_data_buf_size = 70;
-      char error_data_buf[error_data_buf_size];
-      snprintf(error_data_buf, error_data_buf_size, "Failed to set WRITE mode for page size %d with error: %d", write_page_size_bytes, code);
-      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 30, "Programmer error", error_data_buf);
+      char buf[50];
+      snprintf(buf, sizeof(buf), "set_write_mode failed: %d", code);
+      binary_board.send_error(cmd, seq, code, buf);
       return;
     }
 
-    const size_t result_buf_size = 50;
-    char result_buf[result_buf_size];
-    snprintf(result_buf, result_buf_size, "WRITE mode is ON for %d bytes pages", write_page_size_bytes);
-    rpc_board.send_result_string(request_id, result_buf);
+    binary_board.send_response(cmd, seq, nullptr, 0);
 
-  } else if (method == "write_page") {
-    if (params_size != 2) {
-      rpc_board.send_error(request_id, JsonRpcErrorCode::INVALID_PARAMS, "Invalid params", "expected: (page_no, bytes_to_write)");
+  } else if (cmd == CMD_WRITE_PAGE) {
+    // payload: page_no(uint16 LE) + data(uint8[N])
+    if (payload_len < 3) {
+      binary_board.send_error(cmd, seq, ErrorCode::INVALID_PAGE_NO, "missing page_no or data");
       return;
     }
-    const int page_no = atoi(params[0].c_str());
+    uint16_t page_no = payload[0] | ((uint16_t)payload[1] << 8);
+    const uint8_t* data = payload + 2;
+    uint16_t data_len = payload_len - 2;
 
-    const size_t page_size = eeprom_programmer.get_page_size_bytes();
-    uint8_t buffer[page_size];
-    const size_t json_array_size = SerialJsonRpcBoard::json_array_to_byte_array(params[1], buffer, page_size);
-
-    ErrorCode code = eeprom_programmer.write_page(page_no, buffer, json_array_size);
+    ErrorCode code = eeprom_programmer.write_page(page_no, data, data_len);
     if (code != ErrorCode::SUCCESS) {
-      const size_t error_data_buf_size = 70;
-      char error_data_buf[error_data_buf_size];
-      snprintf(error_data_buf, error_data_buf_size, "Failed to WRITE page %d with error: %d", page_no, code);
-      rpc_board.send_error(request_id, JsonRpcErrorCode::SERVER_ERROR - 31, "Programmer error", error_data_buf);
+      char buf[50];
+      snprintf(buf, sizeof(buf), "write_page %d failed: %d", page_no, code);
+      binary_board.send_error(cmd, seq, code, buf);
       return;
     }
 
-    const size_t result_buf_size = 50;
-    char result_buf[result_buf_size];
-    snprintf(result_buf, result_buf_size, "WRITE success. %d bytes written", json_array_size);
-    rpc_board.send_result_string(request_id, result_buf);
+    binary_board.send_response(cmd, seq, nullptr, 0);
 
-  } else if (method == "get_read_perf") {
+  } else if (cmd == CMD_GET_READ_PERF) {
     const size_t page_size = eeprom_programmer.get_page_size_bytes();
-    unsigned int wait_time_for_page[page_size];
-    eeprom_programmer.get_read_byte_usec_for_page(wait_time_for_page, page_size);
+    unsigned int timings[page_size];
+    eeprom_programmer.get_read_byte_usec_for_page(timings, page_size);
 
-    long wait_time_for_page_longs[page_size];
-    for (int i = 0; i < page_size; i++) {
-      wait_time_for_page_longs[i] = (long)wait_time_for_page[i];
+    // serialize as uint16 LE array (explicit byte order)
+    uint8_t timings_le[page_size * 2];
+    for (size_t i = 0; i < page_size; i++) {
+      timings_le[i * 2] = (uint8_t)(timings[i] & 0xFF);
+      timings_le[i * 2 + 1] = (uint8_t)((timings[i] >> 8) & 0xFF);
     }
-    rpc_board.send_result_longs(request_id, wait_time_for_page_longs, page_size);
+    binary_board.send_response(cmd, seq, timings_le, page_size * 2);
 
-  } else if (method == "get_write_perf") {
+  } else if (cmd == CMD_GET_WRITE_PERF) {
     const size_t page_size = eeprom_programmer.get_page_size_bytes();
-    unsigned int wait_time_for_page[page_size];
-    eeprom_programmer.get_write_byte_usec_for_page(wait_time_for_page, page_size);
+    unsigned int timings[page_size];
+    eeprom_programmer.get_write_byte_usec_for_page(timings, page_size);
 
-    long wait_time_for_page_longs[page_size];
-    for (int i = 0; i < page_size; i++) {
-      wait_time_for_page_longs[i] = (long)wait_time_for_page[i];
+    // serialize as uint16 LE array (explicit byte order)
+    uint8_t timings_le[page_size * 2];
+    for (size_t i = 0; i < page_size; i++) {
+      timings_le[i * 2] = (uint8_t)(timings[i] & 0xFF);
+      timings_le[i * 2 + 1] = (uint8_t)((timings[i] >> 8) & 0xFF);
     }
-    rpc_board.send_result_longs(request_id, wait_time_for_page_longs, page_size);
+    binary_board.send_response(cmd, seq, timings_le, page_size * 2);
 
   } else {
-    rpc_board.send_error(request_id, JsonRpcErrorCode::METHOD_NOT_FOUND, "Method not found", method.c_str());
+    // protocol-level error: not from EepromProgrammer ErrorCode enum
+    binary_board.send_error(cmd, seq, 0xFFFF, "unknown command");
   }
 }
 
@@ -162,18 +160,16 @@ void rpc_processor(int request_id, const String &method, const String params[], 
 // Arduino
 
 void setup() {
-  // rpc board
-  rpc_board.init();
+  // protocol board
+  binary_board.init();
   // eeprom programmer
   eeprom_programmer.init_programmer();
-  // eeprom programmer settings
-  long programmer_settings[] = {
-    (long)eeprom_programmer.get_board_wiring_type(),
-    (long)eeprom_programmer.get_max_page_size(),
-  };
-  rpc_board.send_result_longs(0, programmer_settings, sizeof(programmer_settings) / sizeof(programmer_settings[0]));
+  // send boot frame
+  binary_board.send_boot(
+    (uint8_t)eeprom_programmer.get_board_wiring_type(),
+    (uint8_t)eeprom_programmer.get_max_page_size());
 }
 
 void loop() {
-  rpc_board.loop();
+  binary_board.loop();
 }

@@ -59,6 +59,11 @@ class BinaryProtocolClient:
         self.serial = None
         self._seq = 0
 
+    def close(self):
+        if self.serial is not None:
+            self.serial.close()
+            self.serial = None
+
     def init(self):
         """Open serial, wait for BOOT frame from firmware."""
         if self.serial is not None:
@@ -102,6 +107,10 @@ class BinaryProtocolClient:
             raise BinaryProtocolClientError(
                 f"no response for cmd 0x{cmd:02X}, seq {seq}")
 
+        if resp_seq != seq:
+            raise BinaryProtocolClientError(
+                f"seq mismatch: expected {seq}, got {resp_seq}")
+
         if resp_cmd == CMD_ERROR:
             self._handle_error(resp_payload)
 
@@ -109,10 +118,6 @@ class BinaryProtocolClient:
         if resp_cmd != expected_resp:
             raise BinaryProtocolClientError(
                 f"unexpected response cmd 0x{resp_cmd:02X}, expected 0x{expected_resp:02X}")
-
-        if resp_seq != seq:
-            raise BinaryProtocolClientError(
-                f"seq mismatch: expected {seq}, got {resp_seq}")
 
         return resp_payload
 
