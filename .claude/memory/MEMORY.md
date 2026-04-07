@@ -1,13 +1,9 @@
 - [User profile](user_profile.md) — embedded dev, blog author, prefers explicit code and real numbers
 - [Platform support](project_platform_support.md) — MEGA/DUE validated, Giga unverified, UNO unsupported
 - [Giga status](project_giga_status.md) — Giga compiles but had serial issues, needs verification
-- [Performance analysis](project_performance_analysis.md) — ArduinoJson is 62% of cost, binary would give 10x speedup
-- [JSON-RPC tradeoffs](project_json_rpc_tradeoffs.md) — why JSON-RPC is still useful, hybrid approach option
 - [Bugs fixed](project_bugs_fixed.md) — 6 bugs fixed (f9615f9), 7 more identified in refactoring section
 - [WE pin protection](project_we_pin_protection.md) — deep research: ESD diodes are root cause, no pull-up works on DUE
-- [Binary protocol plan](project_binary_protocol_plan.md) — protocol spec and 6-commit incremental migration plan
-- [Blog: binary migration](project_blog_binary_migration.md) — datapoints and structure for blog post about the migration
-- [Baseline performance](project_baseline_performance.md) — DUE+AT28C64 pre-migration: read 7s, write 13s, full 34s
+- [Binary protocol plan](project_binary_protocol_plan.md) — migration COMPLETE: protocol spec, performance results, all 5 steps done
 - [WE jumper prompting](feedback_we_jumper.md) — don't double-ask about jumper state, trust "go"
 - [Significant changes](feedback_significant_changes.md) — always ask before rewriting existing files
 - [Commit separation](feedback_commit_separation.md) — never mix .claude/ context with source code in same commit
